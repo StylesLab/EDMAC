@@ -1,0 +1,375 @@
+using System.Collections;
+using YamlDotNet.Serialization;
+using YamlDotNet.Serialization.NamingConventions;
+
+namespace EDMAC;
+
+public static class SongLoader
+{
+    public static Song Load(string yamlPath, int sampleRate)
+    {
+        string fullPath = Path.GetFullPath(yamlPath);
+        if (!File.Exists(fullPath))
+        {
+            throw new FileNotFoundException("Song YAML file was not found.", fullPath);
+        }
+
+        string yaml = File.ReadAllText(fullPath);
+        var deserializer = new DeserializerBuilder()
+            .WithNamingConvention(UnderscoredNamingConvention.Instance)
+            .IgnoreUnmatchedProperties()
+            .Build();
+
+        SongDefinition definition = deserializer.Deserialize<SongDefinition>(yaml)
+            ?? throw new InvalidDataException("The YAML document is empty.");
+
+        ValidateSongDefinition(definition);
+        string songDirectory = Path.GetDirectoryName(fullPath)!;
+        IReadOnlyList<ChordProgression> progressions = ParseProgressions(definition.Progressions);
+
+        var tracks = new List<Track>(definition.Tracks.Count);
+        foreach (TrackDefinition trackDefinition in definition.Tracks)
+        {
+            tracks.Add(CreateTrack(
+                trackDefinition,
+                songDirectory,
+                sampleRate,
+                definition.Bpm,
+                progressions.Count > 0));
+        }
+
+        ValidateResolvedMappings(tracks, progressions);
+
+        return new Song
+        {
+            Bpm = definition.Bpm,
+            SampleRate = sampleRate,
+            Progressions = progressions,
+            Tracks = tracks
+        };
+    }
+
+    private static void ValidateResolvedMappings(
+        IReadOnlyList<Track> tracks,
+        IReadOnlyList<ChordProgression> progressions)
+    {
+        foreach (Track track in tracks)
+        {
+            foreach ((char symbol, NoteMapping mapping) in track.NoteMappings)
+            {
+                if (!mapping.IsChordRelative)
+                {
+                    continue;
+                }
+
+                foreach (ChordProgression progression in progressions)
+                {
+                    foreach (Chord chord in progression.Chords)
+                    {
+                        for (var valueIndex = 0; valueIndex < mapping.Count; valueIndex++)
+                        {
+                            int note = mapping.Resolve(valueIndex, chord);
+                            if (note is < 0 or > 127)
+                            {
+                                throw new InvalidDataException(
+                                    $"Track '{track.Name}' mapping '{symbol}' resolves to MIDI " +
+                                    $"note {note} for chord '{chord.Name}', outside the 0-127 range.");
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    private static IReadOnlyList<ChordProgression> ParseProgressions(
+        IReadOnlyList<ProgressionDefinition> definitions)
+    {
+        var progressions = new List<ChordProgression>(definitions.Count);
+        var names = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        foreach (ProgressionDefinition definition in definitions)
+        {
+            if (string.IsNullOrWhiteSpace(definition.Name))
+            {
+                throw new InvalidDataException("Every chord progression requires a name.");
+            }
+
+            if (!names.Add(definition.Name))
+            {
+                throw new InvalidDataException(
+                    $"Chord progression name '{definition.Name}' is used more than once.");
+            }
+
+            if (definition.Chords.Count == 0)
+            {
+                throw new InvalidDataException(
+                    $"Chord progression '{definition.Name}' requires at least one chord.");
+            }
+
+            progressions.Add(new ChordProgression
+            {
+                Name = definition.Name,
+                Chords = definition.Chords.Select(Chord.Parse).ToArray(),
+                Control = ParseControl(
+                    definition.Control,
+                    $"Chord progression '{definition.Name}'")
+            });
+        }
+
+        return progressions;
+    }
+
+    private static Track CreateTrack(
+        TrackDefinition definition,
+        string songDirectory,
+        int sampleRate,
+        double bpm,
+        bool hasProgressions)
+    {
+        if (string.IsNullOrWhiteSpace(definition.Name))
+        {
+            throw new InvalidDataException("Every track requires a name.");
+        }
+
+        if (string.IsNullOrWhiteSpace(definition.Soundfont))
+        {
+            throw new InvalidDataException($"Track '{definition.Name}' requires a soundfont.");
+        }
+
+        List<string> patternSources = definition.Patterns.Count > 0
+            ? definition.Patterns
+            : string.IsNullOrWhiteSpace(definition.Pattern)
+                ? []
+                : [definition.Pattern];
+
+        if (patternSources.Count == 0)
+        {
+            throw new InvalidDataException(
+                $"Track '{definition.Name}' requires at least one pattern.");
+        }
+
+        ValidateMidiValue(definition.Channel, 0, 15, definition.Name, "channel");
+        ValidateMidiValue(definition.Bank, 0, 16383, definition.Name, "bank");
+        ValidateMidiValue(definition.Program, 0, 127, definition.Name, "program");
+        ValidateMidiValue(definition.Velocity, 1, 127, definition.Name, "velocity");
+        ValidateAmp(definition.Amp, definition.Name);
+
+        Dictionary<char, NoteMapping> mappings = ParseMappings(definition, hasProgressions);
+        ConsoleKey control = ParseControl(definition.Control, $"Track '{definition.Name}'");
+        string soundFontPath = Path.GetFullPath(definition.Soundfont, songDirectory);
+
+        Pattern[] patterns = patternSources
+            .Select(source => new Pattern(
+                source,
+                definition.Beats,
+                sampleRate,
+                bpm))
+            .ToArray();
+
+        ValidatePatternSymbols(definition.Name, patterns, mappings);
+
+        return new Track
+        {
+            Name = definition.Name,
+            SoundFontPath = soundFontPath,
+            Bank = definition.Bank,
+            Program = definition.Program,
+            Channel = definition.Channel,
+            Velocity = definition.Velocity,
+            Amp = definition.Amp,
+            Control = control,
+            NoteMappings = mappings,
+            Patterns = patterns
+        };
+    }
+
+    private static Dictionary<char, NoteMapping> ParseMappings(
+        TrackDefinition definition,
+        bool hasProgressions)
+    {
+        var mappings = new Dictionary<char, NoteMapping>();
+
+        foreach (Dictionary<string, object> mapEntry in definition.Map)
+        {
+            foreach ((string symbolText, object rawValue) in mapEntry)
+            {
+                if (symbolText.Length != 1 || symbolText[0] is '.' or '|')
+                {
+                    throw new InvalidDataException(
+                        $"Track '{definition.Name}' mapping keys must be one character and cannot be '.' or '|'.");
+                }
+
+                NoteMapping mapping = ParseMappingValue(
+                    rawValue,
+                    definition.Name,
+                    symbolText);
+
+                if (mapping.IsChordRelative && !hasProgressions)
+                {
+                    throw new InvalidDataException(
+                        $"Track '{definition.Name}' mapping '{symbolText}' is chord-relative, " +
+                        "but the song has no chord progressions.");
+                }
+
+                if (!mappings.TryAdd(symbolText[0], mapping))
+                {
+                    throw new InvalidDataException(
+                        $"Track '{definition.Name}' maps symbol '{symbolText}' more than once.");
+                }
+            }
+        }
+
+        if (mappings.Count == 0)
+        {
+            throw new InvalidDataException($"Track '{definition.Name}' requires at least one note mapping.");
+        }
+
+        return mappings;
+    }
+
+    private static NoteMapping ParseMappingValue(
+        object rawValue,
+        string trackName,
+        string symbol)
+    {
+        if (rawValue is IEnumerable sequence and not string)
+        {
+            var indices = new List<int>();
+            foreach (object? item in sequence)
+            {
+                indices.Add(ParseInteger(item, trackName, symbol));
+            }
+
+            return NoteMapping.ChordRelative(indices);
+        }
+
+        int note = ParseInteger(rawValue, trackName, symbol);
+        ValidateMidiValue(note, 0, 127, trackName, $"note mapping '{symbol}'");
+        return NoteMapping.Absolute(note);
+    }
+
+    private static int ParseInteger(object? value, string trackName, string symbol)
+    {
+        if (value is null ||
+            !int.TryParse(value.ToString(), out int parsed))
+        {
+            throw new InvalidDataException(
+                $"Track '{trackName}' mapping '{symbol}' must contain integer values.");
+        }
+
+        return parsed;
+    }
+
+    private static void ValidatePatternSymbols(
+        string trackName,
+        IReadOnlyList<Pattern> patterns,
+        IReadOnlyDictionary<char, NoteMapping> mappings)
+    {
+        foreach (Pattern pattern in patterns)
+        {
+            foreach (char symbol in pattern.Steps)
+            {
+                if (symbol != '.' && !mappings.ContainsKey(symbol))
+                {
+                    throw new InvalidDataException(
+                        $"Track '{trackName}' pattern uses unmapped symbol '{symbol}'.");
+                }
+            }
+        }
+    }
+
+    private static ConsoleKey ParseControl(string control, string owner)
+    {
+        if (!Enum.TryParse(control, true, out ConsoleKey key) ||
+            key < ConsoleKey.F1 ||
+            key > ConsoleKey.F24)
+        {
+            throw new InvalidDataException(
+                $"{owner} control must be a function key such as f1 or f2.");
+        }
+
+        return key;
+    }
+
+    private static void ValidateSongDefinition(SongDefinition definition)
+    {
+        if (definition.Bpm <= 0 || double.IsNaN(definition.Bpm) || double.IsInfinity(definition.Bpm))
+        {
+            throw new InvalidDataException("BPM must be a finite value greater than zero.");
+        }
+
+        if (definition.Tracks.Count == 0)
+        {
+            throw new InvalidDataException("The song must contain at least one track.");
+        }
+    }
+
+    private static void ValidateMidiValue(
+        int value,
+        int minimum,
+        int maximum,
+        string trackName,
+        string field)
+    {
+        if (value < minimum || value > maximum)
+        {
+            throw new InvalidDataException(
+                $"Track '{trackName}' {field} must be between {minimum} and {maximum}.");
+        }
+    }
+
+    private static void ValidateAmp(float amp, string trackName)
+    {
+        if (amp < 0 || float.IsNaN(amp) || float.IsInfinity(amp))
+        {
+            throw new InvalidDataException(
+                $"Track '{trackName}' amp must be a finite value greater than or equal to zero.");
+        }
+    }
+
+    private sealed class SongDefinition
+    {
+        public double Bpm { get; set; }
+
+        public List<ProgressionDefinition> Progressions { get; set; } = [];
+
+        public List<TrackDefinition> Tracks { get; set; } = [];
+    }
+
+    private sealed class ProgressionDefinition
+    {
+        public string Name { get; set; } = string.Empty;
+
+        public List<string> Chords { get; set; } = [];
+
+        public string Control { get; set; } = string.Empty;
+    }
+
+    private sealed class TrackDefinition
+    {
+        public string Name { get; set; } = string.Empty;
+
+        public string Soundfont { get; set; } = string.Empty;
+
+        public int Bank { get; set; }
+
+        public int Program { get; set; }
+
+        public int Channel { get; set; }
+
+        public int Velocity { get; set; } = 127;
+
+        public float Amp { get; set; } = 1.0f;
+
+        public List<Dictionary<string, object>> Map { get; set; } = [];
+
+        public string Pattern { get; set; } = string.Empty;
+
+        public List<string> Patterns { get; set; } = [];
+
+        public int Beats { get; set; }
+
+        public string Control { get; set; } = string.Empty;
+    }
+}

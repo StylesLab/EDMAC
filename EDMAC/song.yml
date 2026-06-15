@@ -1,0 +1,48 @@
+bpm: 120
+
+progressions:
+  - name: "verse"  
+    chords:
+      - Bm2
+      - G2
+      - D2
+      - A2
+    control: f9   
+  - name: "chorus"  
+    chords:
+      - G2
+      - A2
+      - G2
+      - A2
+    control: f10
+  
+tracks:
+
+  - name: kick
+    soundfont: C:\Dev\EDMAC\SONY DRP-2 Digital Drum Pad v2.sf2
+    map:
+     - x: 36
+    patterns:
+      - x|x|x|x
+    beats: 4
+    control: f1
+
+  - name: snare
+    soundfont: C:\Dev\EDMAC\SONY DRP-2 Digital Drum Pad v2.sf2
+    map:
+     - x: 38
+    patterns:
+      - ....x.......x...|....x.......x.xx
+    beats: 16
+    control: f2
+
+  - name: chords
+    soundfont: C:\Dev\EDMAC\Yooreek.sf2
+    map:
+     - x: [9,10,11]     
+    patterns:
+      - x     
+    beats: 1
+    amp: 0.2
+    control: f3
+    

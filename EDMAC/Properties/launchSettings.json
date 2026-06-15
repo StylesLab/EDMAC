@@ -1,0 +1,8 @@
+{
+  "profiles": {
+    "EDMAC": {
+      "commandName": "Project",
+      "commandLineArgs": "song.yml"
+    }
+  }
+}

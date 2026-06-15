@@ -1,0 +1,8 @@
+{
+  "profiles": {
+    "Sf2Dump": {
+      "commandName": "Project",
+      "commandLineArgs": "\"C:\\Dev\\EDMAC\\Yooreek.sf2\""
+    }
+  }
+}
