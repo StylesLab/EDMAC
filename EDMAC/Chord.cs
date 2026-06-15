@@ -4,6 +4,8 @@ namespace EDMAC;
 
 public sealed partial class Chord
 {
+    private const int RootOctave = 2;
+
     private static readonly IReadOnlyDictionary<char, int> NaturalPitchClasses =
         new Dictionary<char, int>
         {
@@ -50,7 +52,7 @@ public sealed partial class Chord
         if (!match.Success)
         {
             throw new InvalidDataException(
-                $"Chord '{text}' is invalid. Use names such as Bm2, G2, C#4, or Bb3.");
+                $"Chord '{text}' is invalid. Use names such as Bm, G, C#, or Bb.");
         }
 
         char noteName = char.ToUpperInvariant(match.Groups["note"].Value[0]);
@@ -67,13 +69,7 @@ public sealed partial class Chord
         }
 
         pitchClass = (pitchClass + 12) % 12;
-        int octave = int.Parse(match.Groups["octave"].Value);
-        int rootMidiNote = checked((octave + 1) * 12 + pitchClass);
-
-        if (rootMidiNote is < 0 or > 127)
-        {
-            throw new InvalidDataException($"Chord '{text}' has a root outside the MIDI note range.");
-        }
+        int rootMidiNote = (RootOctave + 1) * 12 + pitchClass;
 
         bool minor = match.Groups["quality"].Value.Equals(
             "m",
@@ -83,7 +79,7 @@ public sealed partial class Chord
     }
 
     [GeneratedRegex(
-        "^(?<note>[A-Ga-g])(?<accidental>[#b]?)(?<quality>m?)(?<octave>-?\\d+)$",
+        "^(?<note>[A-Ga-g])(?<accidental>[#b]?)(?<quality>m?)$",
         RegexOptions.CultureInvariant)]
     private static partial Regex ChordNameRegex();
 }

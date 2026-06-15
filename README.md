@@ -52,18 +52,18 @@ bpm: 120
 progressions:
   - name: verse
     chords:
-      - Bm2
-      - G2
-      - D2
-      - A2
+      - Bm
+      - G
+      - D
+      - A
     control: f9
 
   - name: chorus
     chords:
-      - G2
-      - A2
-      - G2
-      - A2
+      - G
+      - A
+      - G
+      - A
     control: f10
 
 tracks:
@@ -134,7 +134,7 @@ Optional unless a track uses chord-relative mappings such as `[0]`.
 ```yaml
 progressions:
   - name: verse
-    chords: [Bm2, G2, D2, A2]
+    chords: [Bm, G, D, A]
     control: f9
 ```
 
@@ -167,10 +167,10 @@ Example:
 progressions:
   - name: verse
     chords:
-      - Bm2
-      - G2
-      - D2
-      - A2
+      - Bm
+      - G
+      - D
+      - A
     control: f9
 ```
 
@@ -185,22 +185,22 @@ Controls must be function keys from `f1` through `f24`.
 Supported chord names use this form:
 
 ```text
-NOTE + optional accidental + optional m + octave
+NOTE + optional accidental + optional m
 ```
 
 Examples:
 
 ```text
-C3
-Bm2
-C#4
-Bb3
+C
+Bm
+C#
+Bb
 ```
 
 - No quality suffix means a major triad.
 - `m` means a minor triad.
 - Sharps and flats are supported.
-- MIDI octave numbering is used: `C4` is MIDI note 60.
+- Chord roots use octave 2 internally: `C` is MIDI note 36 and `B` is MIDI note 47.
 
 Extended names such as `Cmaj7`, `G7`, `Dsus4`, and slash chords are not
 currently supported.
@@ -401,7 +401,7 @@ Indices are zero-based positions in the current major or minor triad:
 | `-2` | Third below the root |
 | `-3` | Root, one octave lower |
 
-For `Bm2`:
+For `Bm`:
 
 | Mapping | MIDI note | Result |
 | --- | --- | --- |
@@ -448,7 +448,7 @@ Progression controls select or cycle progressions:
 ```yaml
 progressions:
   - name: verse
-    chords: [Bm2, G2, D2, A2]
+    chords: [Bm, G, D, A]
     control: f9
 ```
 
@@ -540,7 +540,7 @@ range:
 ```yaml
 progressions:
   - name: main
-    chords: [C3]
+    chords: [C]
     control: f9
 ```
 

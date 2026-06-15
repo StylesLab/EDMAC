@@ -3,17 +3,17 @@ bpm: 120
 progressions:
   - name: "verse"  
     chords:
-      - Bm2
-      - G2
-      - D2
-      - A2
+      - Bm
+      - G
+      - D
+      - A
     control: f9   
   - name: "chorus"  
     chords:
-      - G2
-      - A2
-      - G2
-      - A2
+      - G
+      - A
+      - G
+      - A
     control: f10
   
 tracks:
