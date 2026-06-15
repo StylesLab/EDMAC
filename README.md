@@ -1,5 +1,7 @@
 # EDMAC
 
+![EDMAC logo](EDMaC.png)
+
 EDMAC is a real-time, YAML-driven tracker-style music engine for .NET 8. It
 uses SoundFonts for instruments, loops patterns indefinitely, supports
 multiple simultaneous pattern lanes, and lets you mute tracks or select chord
