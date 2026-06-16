@@ -64,7 +64,7 @@ public static class SongLoader
 
                 foreach (ChordProgression progression in progressions)
                 {
-                    foreach (Chord chord in progression.Chords)
+                    foreach (Chord chord in progression.Steps.Select(step => step.Chord))
                     {
                         for (var valueIndex = 0; valueIndex < mapping.Count; valueIndex++)
                         {
@@ -110,7 +110,7 @@ public static class SongLoader
             progressions.Add(new ChordProgression
             {
                 Name = definition.Name,
-                Chords = definition.Chords.Select(Chord.Parse).ToArray(),
+                Steps = ParseProgressionSteps(definition.Name, definition.Chords),
                 Control = ParseControl(
                     definition.Control,
                     $"Chord progression '{definition.Name}'")
@@ -118,6 +118,59 @@ public static class SongLoader
         }
 
         return progressions;
+    }
+
+    private static IReadOnlyList<ChordProgressionStep> ParseProgressionSteps(
+        string progressionName,
+        IReadOnlyList<string> chordTexts)
+    {
+        var steps = new List<ChordProgressionStep>(chordTexts.Count);
+        int startQuarter = 0;
+
+        foreach (string chordText in chordTexts)
+        {
+            (Chord chord, int durationQuarters) = ParseProgressionStep(
+                progressionName,
+                chordText);
+
+            steps.Add(new ChordProgressionStep
+            {
+                Chord = chord,
+                DurationQuarters = durationQuarters,
+                StartQuarter = startQuarter
+            });
+
+            startQuarter = checked(startQuarter + durationQuarters);
+        }
+
+        return steps;
+    }
+
+    private static (Chord Chord, int DurationQuarters) ParseProgressionStep(
+        string progressionName,
+        string text)
+    {
+        string trimmed = text.Trim();
+        int separator = trimmed.LastIndexOf(':');
+
+        if (separator < 0)
+        {
+            return (Chord.Parse(trimmed), ChordProgression.DefaultChordDurationQuarters);
+        }
+
+        string chordText = trimmed[..separator].Trim();
+        string durationText = trimmed[(separator + 1)..].Trim();
+
+        if (chordText.Length == 0 ||
+            !int.TryParse(durationText, out int durationQuarters) ||
+            durationQuarters <= 0)
+        {
+            throw new InvalidDataException(
+                $"Chord '{text}' in progression '{progressionName}' must use a positive " +
+                "duration such as A:3 or G:1.");
+        }
+
+        return (Chord.Parse(chordText), durationQuarters);
     }
 
     private static Track CreateTrack(

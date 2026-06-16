@@ -20,8 +20,7 @@ internal static class Program
                 return 1;
             }
 
-            Song playableSong = SongLoader.Load(args[0], AudioEngine.DefaultSampleRate);
-            using var player = new Player(playableSong);
+            var player = new HotReloadingPlayer(args[0]);
             await player.RunAsync();
             return 0;
         }

@@ -46,6 +46,10 @@ EDMAC\bin\Debug\net8.0\edmac.exe validate song.yml
 
 Press `Escape` during playback to stop.
 
+Playback mode watches the YAML file. When the file is edited and saved, EDMAC
+reloads it and restarts playback. If the edited YAML is invalid, the current
+song keeps playing and the reload error is printed.
+
 ## Complete Example
 
 ```yaml
@@ -57,7 +61,8 @@ progressions:
       - Bm
       - G
       - D
-      - A
+      - A:3
+      - G:1
     control: f9
 
   - name: chorus
@@ -140,8 +145,10 @@ progressions:
     control: f9
 ```
 
-Each chord lasts four quarter-note beats, which is one bar in 4/4. A
-progression loops after its final chord.
+By default, each chord lasts one bar. Add `:N` after a chord to set its
+duration in quarters of a bar. For example, `A:3` lasts three quarters of a
+bar and `G:1` lasts one quarter of a bar. A progression loops after its final
+chord.
 
 The first progression in the file is active when playback starts.
 
@@ -160,7 +167,7 @@ Each progression has these fields:
 | Field | Required | Meaning |
 | --- | --- | --- |
 | `name` | Yes | Unique progression name |
-| `chords` | Yes | One or more chord names |
+| `chords` | Yes | One or more chord names, optionally with `:duration` |
 | `control` | Yes | Function key used to select or cycle the progression |
 
 Example:
@@ -172,9 +179,13 @@ progressions:
       - Bm
       - G
       - D
-      - A
+      - A:3
+      - G:1
     control: f9
 ```
+
+In that example, `Bm`, `G`, and `D` each last one bar. `A:3` lasts three
+quarters of a bar, then `G:1` lasts the final quarter of the bar.
 
 If progressions have different controls, pressing a control selects the
 matching progression. If several progressions share the same control,
@@ -206,6 +217,34 @@ Bb
 
 Extended names such as `Cmaj7`, `G7`, `Dsus4`, and slash chords are not
 currently supported.
+
+### Chord Durations
+
+Chord durations are written after a colon:
+
+```yaml
+chords:
+  - Bm
+  - G
+  - D
+  - A:3
+  - G:1
+```
+
+The duration unit is one quarter of a bar:
+
+| Suffix | Duration |
+| --- | --- |
+| omitted | One full bar, equal to `:4` |
+| `:1` | One quarter of a bar |
+| `:2` | Half a bar |
+| `:3` | Three quarters of a bar |
+| `:4` | One full bar |
+| `:8` | Two full bars |
+
+Durations must be positive integers. They are progression timing values, not
+MIDI note lengths. Track note lengths are still controlled by each track's
+`beats` value.
 
 ## Track Fields
 
@@ -450,7 +489,7 @@ Progression controls select or cycle progressions:
 ```yaml
 progressions:
   - name: verse
-    chords: [Bm, G, D, A]
+    chords: [Bm, G, D, A:3, G:1]
     control: f9
 ```
 
@@ -595,10 +634,15 @@ Before playback, confirm:
 - Absolute notes are in MIDI range 0 through 127.
 - Relative mappings have at least one progression.
 - Chord names use supported major/minor triad syntax.
+- Chord duration suffixes, when present, are positive integers such as `A:3`.
 - Function controls are between `f1` and `f24`.
 - Relative SoundFont paths are relative to the YAML file.
 - `amp` values are non-negative.
 - `edmac validate song.yml` reports the intended first events.
+
+During playback, save the YAML file to hot-reload the song. Valid changes
+restart playback from the beginning; invalid changes are ignored until the
+next successful save.
 
 ## Playback Architecture
 

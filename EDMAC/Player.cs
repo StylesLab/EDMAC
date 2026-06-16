@@ -8,12 +8,13 @@ public sealed class Player : IDisposable
     private readonly SoundFontInstrument[] instruments;
     private readonly AudioEngine audioEngine;
     private readonly Channel<ScheduledTrackNote> noteQueue;
-    private readonly Channel<string> diagnosticQueue;
+    private readonly bool printStartupDiagnostics;
     private bool disposed;
 
-    public Player(Song song)
+    public Player(Song song, bool printStartupDiagnostics = true)
     {
         this.song = song;
+        this.printStartupDiagnostics = printStartupDiagnostics;
         instruments = song.Tracks
             .Select(track => new SoundFontInstrument(track, song.SampleRate))
             .ToArray();
@@ -27,51 +28,68 @@ public sealed class Player : IDisposable
                 SingleWriter = true
             });
 
-        diagnosticQueue = Channel.CreateBounded<string>(
-            new BoundedChannelOptions(256)
-            {
-                FullMode = BoundedChannelFullMode.DropWrite,
-                SingleReader = true,
-                SingleWriter = true
-            });
     }
 
-    public async Task RunAsync()
+    public async Task RunAsync(CancellationToken cancellationToken)
     {
-        PrintStartupDiagnostics();
-        Console.WriteLine("Press the configured function keys to toggle tracks. Press Escape to stop.");
+        if (printStartupDiagnostics)
+        {
+            PrintStartupDiagnostics();
+        }
 
-        using var cancellation = new CancellationTokenSource();
+        using var playbackCancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         var sequencer = new Sequencer(song, audioEngine, noteQueue.Writer);
 
         Task dispatchTask = StartDedicatedWorker(
-            () => DispatchNotes(noteQueue.Reader, cancellation.Token),
-            cancellation.Token);
+            () => DispatchNotes(noteQueue.Reader, playbackCancellation.Token),
+            playbackCancellation.Token);
         Task sequencerTask = StartDedicatedWorker(
-            () => sequencer.Run(cancellation.Token),
-            cancellation.Token);
-        Task diagnosticTask = PrintDiagnosticsAsync(
-            diagnosticQueue.Reader,
-            cancellation.Token);
-
+            () => sequencer.Run(playbackCancellation.Token),
+            playbackCancellation.Token);
         audioEngine.Start();
 
         try
         {
-            await ReadKeyboardAsync(cancellation);
+            await Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken);
         }
         finally
         {
-            cancellation.Cancel();
+            playbackCancellation.Cancel();
             audioEngine.Stop();
 
             try
             {
-                await Task.WhenAll(sequencerTask, dispatchTask, diagnosticTask);
+                await Task.WhenAll(sequencerTask, dispatchTask);
             }
             catch (OperationCanceledException)
             {
             }
+        }
+    }
+
+    public void HandleKey(ConsoleKey key)
+    {
+        ChordProgression? progression = song.CycleProgression(key);
+        if (progression is not null)
+        {
+            Console.WriteLine($"Progression={progression.Name}");
+        }
+
+        for (var trackIndex = 0; trackIndex < song.Tracks.Count; trackIndex++)
+        {
+            Track track = song.Tracks[trackIndex];
+            if (track.Control != key)
+            {
+                continue;
+            }
+
+            bool enabled = track.Toggle();
+            if (!enabled)
+            {
+                instruments[trackIndex].StopChannel(track.Channel);
+            }
+
+            Console.WriteLine($"{track.Name} {(enabled ? "enabled" : "muted")}");
         }
     }
 
@@ -131,62 +149,8 @@ public sealed class Player : IDisposable
                     item.Note.Channel,
                     item.Note.Note,
                     item.Note.Velocity);
-
-                diagnosticQueue.Writer.TryWrite(
-                    $"{track.Name} NoteOn {item.Note.Note}");
             }
             while (reader.TryRead(out item));
-        }
-    }
-
-    private static async Task PrintDiagnosticsAsync(
-        ChannelReader<string> reader,
-        CancellationToken cancellationToken)
-    {
-        await foreach (string message in reader.ReadAllAsync(cancellationToken))
-        {
-            Console.WriteLine(message);
-        }
-    }
-
-    private async Task ReadKeyboardAsync(CancellationTokenSource cancellation)
-    {
-        while (!cancellation.IsCancellationRequested)
-        {
-            if (!Console.KeyAvailable)
-            {
-                await Task.Delay(20, cancellation.Token);
-                continue;
-            }
-
-            ConsoleKey key = Console.ReadKey(intercept: true).Key;
-            if (key == ConsoleKey.Escape)
-            {
-                return;
-            }
-
-            ChordProgression? progression = song.CycleProgression(key);
-            if (progression is not null)
-            {
-                Console.WriteLine($"Progression={progression.Name}");
-            }
-
-            for (var trackIndex = 0; trackIndex < song.Tracks.Count; trackIndex++)
-            {
-                Track track = song.Tracks[trackIndex];
-                if (track.Control != key)
-                {
-                    continue;
-                }
-
-                bool enabled = track.Toggle();
-                if (!enabled)
-                {
-                    instruments[trackIndex].StopChannel(track.Channel);
-                }
-
-                Console.WriteLine($"{track.Name} {(enabled ? "enabled" : "muted")}");
-            }
         }
     }
 

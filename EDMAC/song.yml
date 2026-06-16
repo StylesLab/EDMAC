@@ -6,7 +6,8 @@ progressions:
       - Bm
       - G
       - D
-      - A
+      - A:3
+      - G:1
     control: f9   
   - name: "chorus"  
     chords:
@@ -37,12 +38,28 @@ tracks:
     control: f2
 
   - name: chords
-    soundfont: C:\Dev\EDMAC\Yooreek.sf2
+    soundfont: C:\Dev\EDMAC\ColomboGMGS2.sf2
+    bank: 0
+    program: 85
+    channel: 0
     map:
      - x: [9,10,11]     
     patterns:
       - x     
-    beats: 1
+    beats: 4
     amp: 0.2
     control: f3
-    
+  
+  - name: bass
+    soundfont: C:\Dev\EDMAC\ColomboGMGS2.sf2
+    bank: 3
+    program: 38
+    channel: 0
+    map:
+     - x: [-3]
+     - y: [0]
+    patterns:
+      - xyxyxyxy
+    beats: 8
+    amp: 0.4
+    control: f4

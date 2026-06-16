@@ -12,7 +12,7 @@ public sealed class Song
 
     public required IReadOnlyList<Track> Tracks { get; init; }
 
-    public double SamplesPerChord => SampleRate * 240.0 / Bpm;
+    public double SamplesPerChordQuarter => SampleRate * 60.0 / Bpm;
 
     public ChordProgression? ActiveProgression =>
         Progressions.Count == 0
@@ -27,9 +27,8 @@ public sealed class Song
             return null;
         }
 
-        long absoluteChord = (long)Math.Floor(samplePosition / SamplesPerChord);
-        int chordIndex = (int)(absoluteChord % progression.Chords.Count);
-        return progression.Chords[chordIndex];
+        int absoluteQuarter = (int)Math.Floor(samplePosition / SamplesPerChordQuarter);
+        return progression.GetChordAtQuarter(absoluteQuarter);
     }
 
     public ChordProgression? CycleProgression(ConsoleKey control)
