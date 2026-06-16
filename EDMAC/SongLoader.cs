@@ -185,9 +185,13 @@ public static class SongLoader
             throw new InvalidDataException("Every track requires a name.");
         }
 
-        if (string.IsNullOrWhiteSpace(definition.Soundfont))
+        bool hasSoundFont = !string.IsNullOrWhiteSpace(definition.Soundfont);
+        bool hasSample = !string.IsNullOrWhiteSpace(definition.Sample);
+
+        if (hasSoundFont == hasSample)
         {
-            throw new InvalidDataException($"Track '{definition.Name}' requires a soundfont.");
+            throw new InvalidDataException(
+                $"Track '{definition.Name}' must specify exactly one of soundfont or sample.");
         }
 
         List<string> patternSources = definition.Patterns.Count > 0
@@ -210,7 +214,15 @@ public static class SongLoader
 
         Dictionary<char, NoteMapping> mappings = ParseMappings(definition, hasProgressions);
         ConsoleKey control = ParseControl(definition.Control, $"Track '{definition.Name}'");
-        string soundFontPath = Path.GetFullPath(definition.Soundfont, songDirectory);
+        string? soundFontPath = hasSoundFont
+            ? Path.GetFullPath(definition.Soundfont, songDirectory)
+            : null;
+        string? samplePath = hasSample
+            ? Path.GetFullPath(definition.Sample, songDirectory)
+            : null;
+        SampleRootNote? sampleRootNote = hasSample
+            ? ParseSampleRootNote(definition, samplePath!)
+            : null;
 
         Pattern[] patterns = patternSources
             .Select(source => new Pattern(
@@ -225,7 +237,12 @@ public static class SongLoader
         return new Track
         {
             Name = definition.Name,
+            InstrumentKind = hasSoundFont
+                ? TrackInstrumentKind.SoundFont
+                : TrackInstrumentKind.Sample,
             SoundFontPath = soundFontPath,
+            SamplePath = samplePath,
+            SampleRootNote = sampleRootNote,
             Bank = definition.Bank,
             Program = definition.Program,
             Channel = definition.Channel,
@@ -235,6 +252,34 @@ public static class SongLoader
             NoteMappings = mappings,
             Patterns = patterns
         };
+    }
+
+    private static SampleRootNote ParseSampleRootNote(
+        TrackDefinition definition,
+        string samplePath)
+    {
+        string? noteText = string.IsNullOrWhiteSpace(definition.SampleNote)
+            ? TryInferSampleNote(samplePath)
+            : definition.SampleNote;
+
+        if (string.IsNullOrWhiteSpace(noteText))
+        {
+            throw new InvalidDataException(
+                $"Track '{definition.Name}' uses a sample but does not specify sampleNote, " +
+                "and no trailing note name could be inferred from the file name.");
+        }
+
+        return SampleRootNote.Parse(noteText);
+    }
+
+    private static string? TryInferSampleNote(string samplePath)
+    {
+        string fileName = Path.GetFileNameWithoutExtension(samplePath);
+        string[] parts = fileName.Split(
+            [' ', '_', '-'],
+            StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+
+        return parts.Length == 0 ? null : parts[^1];
     }
 
     private static Dictionary<char, NoteMapping> ParseMappings(
@@ -404,6 +449,11 @@ public static class SongLoader
         public string Name { get; set; } = string.Empty;
 
         public string Soundfont { get; set; } = string.Empty;
+
+        public string Sample { get; set; } = string.Empty;
+
+        [YamlMember(Alias = "sampleNote", ApplyNamingConventions = false)]
+        public string SampleNote { get; set; } = string.Empty;
 
         public int Bank { get; set; }
 

@@ -157,8 +157,9 @@ The first progression in the file is active when playback starts.
 Required. A song must contain at least one track.
 
 Each track owns a separate MeltySynth synthesizer and SoundFont instance.
-Tracks may use the same SoundFont file while retaining independent playback,
-program, volume, and mute state.
+Sample tracks own a preloaded sample playback engine. Tracks may share the
+same SoundFont or sample file while retaining independent playback, program,
+volume, and mute state.
 
 ## Chord Progressions
 
@@ -251,7 +252,9 @@ MIDI note lengths. Track note lengths are still controlled by each track's
 | Field | Required | Default | Meaning |
 | --- | --- | --- | --- |
 | `name` | Yes | - | Diagnostic name for the track |
-| `soundfont` | Yes | - | Path to a `.sf2` file |
+| `soundfont` | Yes, unless `sample` is used | - | Path to a `.sf2` file |
+| `sample` | Yes, unless `soundfont` is used | - | Path to an audio sample file |
+| `sampleNote` | No | inferred from filename | Root note of a sample track |
 | `bank` | No | `0` | MIDI bank, from 0 through 16383 |
 | `program` | No | `0` | SoundFont preset program, from 0 through 127 |
 | `channel` | No | `0` | MIDI channel, from 0 through 15 |
@@ -272,6 +275,9 @@ pattern: x|x|x|x
 Do not specify both forms. If `patterns:` is present and non-empty, it takes
 precedence over `pattern:`.
 
+Each track must specify exactly one audio source: either `soundfont` or
+`sample`.
+
 ### SoundFont Paths
 
 Paths may be absolute:
@@ -291,6 +297,59 @@ literally.
 
 EDMAC does not assume General MIDI or channel 10 drums. `bank`, `program`, and
 `channel` are applied exactly as authored.
+
+### Sample Tracks
+
+As an alternative to a SoundFont, a track can play a single audio sample:
+
+```yaml
+- name: sampled-synth
+  sample: 'd:\samples\mysynth c.wav'
+  map:
+    - x: [0, 1, 2]
+  patterns:
+    - x
+  beats: 1
+  amp: 0.5
+  control: f4
+```
+
+The sample is loaded before playback and then pitched when notes are
+triggered by the pattern. The audio callback only renders already loaded
+sample data.
+
+`sampleNote` tells EDMAC what note the original sample is playing:
+
+```yaml
+sample: 'd:\samples\mysynth.wav'
+sampleNote: c
+```
+
+If `sampleNote` is omitted, EDMAC tries to infer it from the final token in
+the filename. For example, this infers `c`:
+
+```yaml
+sample: 'd:\samples\mysynth c.wav'
+```
+
+Supported sample note names:
+
+```text
+c
+f#
+bb
+c4
+f#3
+```
+
+If the sample note has no octave, such as `c`, EDMAC treats it as a pitch
+class and chooses the nearest matching C to the target MIDI note before
+pitch-shifting. If an octave is supplied, such as `c4`, that exact MIDI note is
+used as the pitch reference.
+
+Samples are one-shot voices. They stop naturally at the end of the file, and
+EDMAC also stops currently sounding sample voices at each track step boundary
+and when the track is muted.
 
 ### `amp`
 

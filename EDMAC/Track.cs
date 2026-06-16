@@ -6,7 +6,13 @@ public sealed class Track
 
     public required string Name { get; init; }
 
-    public required string SoundFontPath { get; init; }
+    public required TrackInstrumentKind InstrumentKind { get; init; }
+
+    public string? SoundFontPath { get; init; }
+
+    public string? SamplePath { get; init; }
+
+    public SampleRootNote? SampleRootNote { get; init; }
 
     public required int Bank { get; init; }
 
@@ -34,4 +40,10 @@ public sealed class Track
         Interlocked.Exchange(ref enabled, next);
         return next != 0;
     }
+}
+
+public enum TrackInstrumentKind
+{
+    SoundFont,
+    Sample
 }

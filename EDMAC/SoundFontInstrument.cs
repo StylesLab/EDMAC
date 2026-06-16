@@ -2,7 +2,7 @@ using MeltySynth;
 
 namespace EDMAC;
 
-public sealed class SoundFontInstrument
+public sealed class SoundFontInstrument : IInstrument
 {
     private const int ControlChange = 0xB0;
     private const int ProgramChangeCommand = 0xC0;
@@ -14,6 +14,11 @@ public sealed class SoundFontInstrument
 
     public SoundFontInstrument(Track track, int sampleRate)
     {
+        if (track.SoundFontPath is null)
+        {
+            throw new InvalidOperationException("SoundFont track requires a SoundFont path.");
+        }
+
         if (!File.Exists(track.SoundFontPath))
         {
             throw new FileNotFoundException(

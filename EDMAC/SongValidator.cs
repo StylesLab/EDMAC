@@ -21,6 +21,7 @@ public static class SongValidator
         {
             Console.WriteLine();
             Console.WriteLine($"Track={track.Name}");
+            Console.WriteLine($"Instrument={track.InstrumentKind}");
             Console.WriteLine($"Patterns={track.Patterns.Count}");
 
             for (var patternIndex = 0; patternIndex < track.Patterns.Count; patternIndex++)

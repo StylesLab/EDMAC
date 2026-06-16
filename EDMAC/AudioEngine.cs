@@ -10,14 +10,14 @@ public sealed class AudioEngine : IWaveProvider, IDisposable
     // Keep the shared render clock granular without scheduling events here.
     private const int RenderBlockFrames = 64;
 
-    private readonly SoundFontInstrument[] instruments;
+    private readonly IInstrument[] instruments;
     private readonly float[] renderLeft = new float[RenderBlockFrames];
     private readonly float[] renderRight = new float[RenderBlockFrames];
     private readonly WaveOutEvent output;
     private long samplePosition;
     private bool disposed;
 
-    public AudioEngine(SoundFontInstrument[] instruments, int sampleRate)
+    public AudioEngine(IInstrument[] instruments, int sampleRate)
     {
         this.instruments = instruments;
         WaveFormat = WaveFormat.CreateIeeeFloatWaveFormat(sampleRate, Channels);
@@ -63,8 +63,10 @@ public sealed class AudioEngine : IWaveProvider, IDisposable
             Span<float> right = renderRight.AsSpan(0, frames);
             Span<float> destination = outputSamples.Slice(frameOffset * Channels, frames * Channels);
 
-            foreach (SoundFontInstrument instrument in instruments)
+            foreach (IInstrument instrument in instruments)
             {
+                left.Clear();
+                right.Clear();
                 instrument.Render(left, right);
 
                 for (var frame = 0; frame < frames; frame++)
@@ -93,7 +95,7 @@ public sealed class AudioEngine : IWaveProvider, IDisposable
         output.Stop();
         output.Dispose();
 
-        foreach (SoundFontInstrument instrument in instruments)
+        foreach (IInstrument instrument in instruments)
         {
             instrument.StopAll();
         }

@@ -5,7 +5,7 @@ namespace EDMAC;
 public sealed class Player : IDisposable
 {
     private readonly Song song;
-    private readonly SoundFontInstrument[] instruments;
+    private readonly IInstrument[] instruments;
     private readonly AudioEngine audioEngine;
     private readonly Channel<ScheduledTrackNote> noteQueue;
     private readonly bool printStartupDiagnostics;
@@ -16,7 +16,7 @@ public sealed class Player : IDisposable
         this.song = song;
         this.printStartupDiagnostics = printStartupDiagnostics;
         instruments = song.Tracks
-            .Select(track => new SoundFontInstrument(track, song.SampleRate))
+            .Select(track => InstrumentFactory.Create(track, song.SampleRate))
             .ToArray();
 
         audioEngine = new AudioEngine(instruments, song.SampleRate);
@@ -159,6 +159,7 @@ public sealed class Player : IDisposable
         foreach (Track track in song.Tracks)
         {
             Console.WriteLine($"Track={track.Name}");
+            Console.WriteLine($"Instrument={track.InstrumentKind}");
             Console.WriteLine($"Patterns={track.Patterns.Count}");
             Console.WriteLine(
                 $"PatternLengths={string.Join(",", track.Patterns.Select(pattern => pattern.Length))}");
