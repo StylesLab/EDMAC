@@ -20,7 +20,7 @@ progressions:
 tracks:
 
   - name: kick
-    soundfont: C:\Dev\EDMAC\SONY DRP-2 Digital Drum Pad v2.sf2
+    soundfont: D:\soundfonts\Electrokit-New-Sharp.sf2
     map:
      - x: 36
     patterns:
@@ -29,7 +29,7 @@ tracks:
     control: f1
 
   - name: snare
-    soundfont: C:\Dev\EDMAC\SONY DRP-2 Digital Drum Pad v2.sf2
+    soundfont:  D:\soundfonts\Electrokit-New-Sharp.sf2
     map:
      - x: 38
     patterns:
@@ -38,7 +38,7 @@ tracks:
     control: f2
 
   - name: chords
-    soundfont: C:\Dev\EDMAC\ColomboGMGS2.sf2
+    soundfont: D:\soundfonts\ColomboGMGS2.sf2
     bank: 0
     program: 85
     channel: 0
@@ -51,7 +51,7 @@ tracks:
     control: f3
   
   - name: bass
-    soundfont: C:\Dev\EDMAC\ColomboGMGS2.sf2
+    soundfont: D:\soundfonts\ColomboGMGS2.sf2
     bank: 3
     program: 38
     channel: 0
@@ -77,7 +77,7 @@ tracks:
 
     control: f4
 
-  - name: lead2
+  - name: lead
     sample: D:\samples\80s Synths Samples\Multisamples\Matrix Poly\80s_MatrixPoly_C1.wav
     sampleNote: c4
     map:
@@ -101,5 +101,30 @@ tracks:
         feedback: 0.35
         mix: 0.25
     control: f5
-    
 
+  - name: arp
+    sample: D:\samples\Essential Synths\Multis\Classic House Piano\House Piano C4.wav
+    sampleNote: c4
+    map:
+       - a: [0]   
+       - b: [1]       
+       - z: [3]
+       - x: [4]
+       - c: [5]
+    beats: 16
+    amp: 0.1
+    patterns:
+      - abzxcxzbabzxcxzbabzxcxzbabzxcxzbabzxcxzb
+    control: f6
+    effects:
+      - type: lowpass
+        from: 500
+        to: 9000
+        durationBeats: 16
+        q: 0.8 
+
+      - type: chorus
+        mix: 0.3
+        rateHz: 0.35
+        delayMs: 18
+        depthMs: 8

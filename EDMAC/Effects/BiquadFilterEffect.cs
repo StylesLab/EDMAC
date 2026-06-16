@@ -44,7 +44,8 @@ public sealed class BiquadFilterEffect : IAudioEffect
 
     public void Process(Span<float> left, Span<float> right)
     {
-        for (var index = 0; index < left.Length; index++)
+        var index = 0;
+        while (index < left.Length)
         {
             if (sweepSamples > 0)
             {
@@ -52,9 +53,16 @@ public sealed class BiquadFilterEffect : IAudioEffect
                 UpdateCoefficients(startCutoff + (endCutoff - startCutoff) * progress);
             }
 
-            left[index] = ProcessSample(left[index], ref leftState);
-            right[index] = ProcessSample(right[index], ref rightState);
-            processedSamples++;
+            int block = sweepSamples > 0 ? Math.Min(16, left.Length - index) : left.Length - index;
+            int end = index + block;
+
+            for (; index < end; index++)
+            {
+                left[index] = ProcessSample(left[index], ref leftState);
+                right[index] = ProcessSample(right[index], ref rightState);
+            }
+
+            processedSamples += block;
         }
     }
 

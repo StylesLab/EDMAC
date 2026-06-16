@@ -122,7 +122,10 @@ public sealed class SampleInstrument : IInstrument
         int read;
         while ((read = reader.Read(buffer, 0, buffer.Length)) > 0)
         {
-            interleaved.AddRange(buffer.AsSpan(0, read).ToArray());
+            for (var index = 0; index < read; index++)
+            {
+                interleaved.Add(buffer[index]);
+            }
         }
 
         int frames = interleaved.Count / channels;

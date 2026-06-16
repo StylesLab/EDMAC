@@ -91,7 +91,7 @@ public sealed class Sequencer
                     }
                 }
 
-                Thread.SpinWait(64);
+                Thread.Sleep(1);
             }
         }
         finally

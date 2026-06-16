@@ -8,8 +8,8 @@ public sealed class AudioEngine : IWaveProvider, IDisposable
 {
     public const int DefaultSampleRate = 44100;
     private const int Channels = 2;
-    // Keep the shared render clock granular without scheduling events here.
-    private const int RenderBlockFrames = 64;
+    // Larger chunks reduce callback overhead under heavy instrument/effect load.
+    private const int RenderBlockFrames = 256;
 
     private readonly IInstrument[] instruments;
     private readonly IAudioEffect[][] effects;

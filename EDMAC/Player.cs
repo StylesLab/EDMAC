@@ -130,35 +130,34 @@ public sealed class Player : IDisposable
         Thread.CurrentThread.Name ??= "EDMAC MIDI Dispatcher";
         Thread.CurrentThread.Priority = ThreadPriority.Highest;
 
-        while (!cancellationToken.IsCancellationRequested)
+        try
         {
-            if (!reader.TryRead(out ScheduledTrackNote item))
+            while (reader.WaitToReadAsync(cancellationToken).AsTask().GetAwaiter().GetResult())
             {
-                Thread.SpinWait(64);
-                continue;
-            }
-
-            do
-            {
-                Track track = song.Tracks[item.TrackIndex];
-
-                if (item.Kind == ScheduledNoteKind.NoteOffAll)
+                while (reader.TryRead(out ScheduledTrackNote item))
                 {
-                    instruments[item.TrackIndex].StopChannel(item.Note.Channel);
-                    continue;
-                }
+                    Track track = song.Tracks[item.TrackIndex];
 
-                if (!track.Enabled)
-                {
-                    continue;
-                }
+                    if (item.Kind == ScheduledNoteKind.NoteOffAll)
+                    {
+                        instruments[item.TrackIndex].StopChannel(item.Note.Channel);
+                        continue;
+                    }
 
-                instruments[item.TrackIndex].NoteOn(
-                    item.Note.Channel,
-                    item.Note.Note,
-                    item.Note.Velocity);
+                    if (!track.Enabled)
+                    {
+                        continue;
+                    }
+
+                    instruments[item.TrackIndex].NoteOn(
+                        item.Note.Channel,
+                        item.Note.Note,
+                        item.Note.Velocity);
+                }
             }
-            while (reader.TryRead(out item));
+        }
+        catch (OperationCanceledException)
+        {
         }
     }
 
