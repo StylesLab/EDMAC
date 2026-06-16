@@ -181,42 +181,64 @@ public sealed class HotReloadingPlayer
         player?.Dispose();
     }
 
-    private async Task ReadKeyboardAsync(CancellationTokenSource cancellation)
+    private Task ReadKeyboardAsync(CancellationTokenSource cancellation)
     {
+        return Task.Factory.StartNew(
+            () => ReadKeyboardLoop(cancellation),
+            CancellationToken.None,
+            TaskCreationOptions.LongRunning,
+            TaskScheduler.Default);
+    }
+
+    private void ReadKeyboardLoop(CancellationTokenSource cancellation)
+    {
+        Thread.CurrentThread.Name ??= "EDMAC Keyboard";
+        Thread.CurrentThread.Priority = ThreadPriority.AboveNormal;
+
         while (!cancellation.IsCancellationRequested)
         {
-            if (!Console.KeyAvailable)
-            {
-                await Task.Delay(20, cancellation.Token);
-                continue;
-            }
-
             ConsoleKey key = Console.ReadKey(intercept: true).Key;
             if (key is ConsoleKey.Escape or ConsoleKey.Q)
             {
                 return;
             }
 
-            if (key == ConsoleKey.Spacebar)
+            try
             {
-                await TogglePlayPauseAsync();
-                continue;
+                HandleKeyboardInputAsync(key).GetAwaiter().GetResult();
             }
-
-            if (key == ConsoleKey.R)
+            catch (OperationCanceledException) when (cancellation.IsCancellationRequested)
             {
-                await RestartAsync();
-                continue;
+                return;
             }
-
-            Player? player;
-            lock (playerLock)
+            catch (Exception exception)
             {
-                player = currentPlayer;
+                ConsoleUi.Error($"Key handling failed: {exception.Message}");
             }
-
-            player?.HandleKey(key);
         }
+    }
+
+    private async Task HandleKeyboardInputAsync(ConsoleKey key)
+    {
+        if (key == ConsoleKey.Spacebar)
+        {
+            await TogglePlayPauseAsync();
+            return;
+        }
+
+        if (key == ConsoleKey.R)
+        {
+            await RestartAsync();
+            return;
+        }
+
+        Player? player;
+        lock (playerLock)
+        {
+            player = currentPlayer;
+        }
+
+        player?.HandleKey(key);
     }
 
     private async Task TogglePlayPauseAsync()
