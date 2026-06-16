@@ -2,7 +2,7 @@
   "profiles": {
     "Sf2Dump": {
       "commandName": "Project",
-      "commandLineArgs": "\"C:\\Dev\\EDMAC\\ColomboGMGS2.sf2\""
+      "commandLineArgs": "D:\\"
     }
   }
 }
