@@ -63,3 +63,21 @@ tracks:
     beats: 8
     amp: 0.4
     control: f4
+
+  - name: lead
+    soundfont: C:\Dev\EDMAC\ColomboGMGS2.sf2
+    bank: 0
+    program: 90
+    channel: 0
+    map:
+     - b: [5]
+     - a: [7]
+     - z: [8]
+     - x: [9]
+     - c: [11]
+    patterns:
+      - ..xx..zzxx..zzxxcczz..zx........|..xx..zzxx..zzxxcczz..za.b......
+    beats: 8
+    amp: 1
+    control: f5
+
