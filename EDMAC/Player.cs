@@ -17,6 +17,11 @@ public sealed class Player : IDisposable
     {
         this.song = song;
         this.printStartupDiagnostics = printStartupDiagnostics;
+        foreach (Track track in song.Tracks)
+        {
+            track.InitializeEnabledState();
+        }
+
         instruments = song.Tracks
             .Select(track => InstrumentFactory.Create(track, song.SampleRate))
             .ToArray();
@@ -174,6 +179,7 @@ public sealed class Player : IDisposable
             ConsoleUi.KeyValue("SamplesPerStep", track.TimingPattern.SamplesPerStep.ToString());
             ConsoleUi.KeyValue("Amp", track.Amp.ToString());
             ConsoleUi.KeyValue("Effects", track.Effects.Count.ToString());
+            ConsoleUi.KeyValue("Enabled", track.Enabled.ToString());
         }
 
         if (song.ActiveProgression is not null)

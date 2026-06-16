@@ -26,7 +26,9 @@ tracks:
     patterns:
       - x|x|x|x
     beats: 4
+    amp: 0.8
     control: f1
+    status: enabled
 
   - name: snare
     soundfont:  D:\soundfonts\Electrokit-New-Sharp.sf2
@@ -35,20 +37,23 @@ tracks:
     patterns:
       - ....x.......x...|....x.......x.xx
     beats: 16
+    amp: 0.8
     control: f2
+    status: disabled
 
   - name: chords
     soundfont: D:\soundfonts\ColomboGMGS2.sf2
     bank: 0
-    program: 85
+    program: 52
     channel: 0
     map:
-     - x: [9,10,11]     
+     - x: [3,4,5]     
     patterns:
       - x     
     beats: 4
     amp: 0.2
     control: f3
+    status: disabled
   
   - name: bass
     soundfont: D:\soundfonts\ColomboGMGS2.sf2
@@ -74,8 +79,8 @@ tracks:
         rateHz: 0.35
         delayMs: 18
         depthMs: 8
-
     control: f4
+    status: disabled
 
   - name: lead
     sample: D:\samples\80s Synths Samples\Multisamples\Matrix Poly\80s_MatrixPoly_C1.wav
@@ -101,9 +106,10 @@ tracks:
         feedback: 0.35
         mix: 0.25
     control: f5
+    status: disabled
 
   - name: arp
-    sample: D:\samples\Essential Synths\Multis\Classic House Piano\House Piano C4.wav
+    sample: D:\samples\Deeper House\Instruments\RushArp\DH_RushArp-C4.wav
     sampleNote: c4
     map:
        - a: [0]   
@@ -128,3 +134,16 @@ tracks:
         rateHz: 0.35
         delayMs: 18
         depthMs: 8
+    status: disabled
+
+  - name: fx
+    sample: D:\samples\Essential Drumkits\Drum & Bass Kit\D&B Drop FX 01.wav    
+    sampleNote: c
+    map:     
+     - x: [0]     
+    patterns:
+      - x...
+    beats: 1
+    amp: 0.1   
+    control: f7
+    status: disabled

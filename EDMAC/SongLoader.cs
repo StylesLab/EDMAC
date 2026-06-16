@@ -233,6 +233,7 @@ public static class SongLoader
         ValidateMidiValue(definition.Program, 0, 127, definition.Name, "program");
         ValidateMidiValue(definition.Velocity, 1, 127, definition.Name, "velocity");
         ValidateAmp(definition.Amp, definition.Name);
+        bool initiallyEnabled = ParseInitialEnabled(definition);
 
         Dictionary<char, NoteMapping> mappings = ParseMappings(definition, hasProgressions);
         ConsoleKey control = ParseControl(definition.Control, $"Track '{definition.Name}'");
@@ -259,6 +260,7 @@ public static class SongLoader
         return new Track
         {
             Name = definition.Name,
+            InitiallyEnabled = initiallyEnabled,
             InstrumentKind = hasSoundFont
                 ? TrackInstrumentKind.SoundFont
                 : TrackInstrumentKind.Sample,
@@ -275,6 +277,32 @@ public static class SongLoader
             NoteMappings = mappings,
             Patterns = patterns
         };
+    }
+
+    private static bool ParseInitialEnabled(TrackDefinition definition)
+    {
+        if (definition.Enabled.HasValue)
+        {
+            return definition.Enabled.Value;
+        }
+
+        if (string.IsNullOrWhiteSpace(definition.Status))
+        {
+            return true;
+        }
+
+        if (definition.Status.Equals("enabled", StringComparison.OrdinalIgnoreCase))
+        {
+            return true;
+        }
+
+        if (definition.Status.Equals("disabled", StringComparison.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+
+        throw new InvalidDataException(
+            $"Track '{definition.Name}' status must be enabled or disabled.");
     }
 
     private static IReadOnlyList<TrackEffectSettings> ParseEffects(
@@ -504,6 +532,10 @@ public static class SongLoader
     private sealed class TrackDefinition
     {
         public string Name { get; set; } = string.Empty;
+
+        public bool? Enabled { get; set; }
+
+        public string Status { get; set; } = string.Empty;
 
         public string Soundfont { get; set; } = string.Empty;
 

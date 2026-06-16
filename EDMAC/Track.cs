@@ -4,9 +4,11 @@ using EDMAC.Effects;
 
 public sealed class Track
 {
-    private int enabled = 1;
+    private int enabled;
 
     public required string Name { get; init; }
+
+    public required bool InitiallyEnabled { get; init; }
 
     public required TrackInstrumentKind InstrumentKind { get; init; }
 
@@ -37,6 +39,11 @@ public sealed class Track
     public Pattern TimingPattern => Patterns[0];
 
     public bool Enabled => Volatile.Read(ref enabled) != 0;
+
+    public void InitializeEnabledState()
+    {
+        Interlocked.Exchange(ref enabled, InitiallyEnabled ? 1 : 0);
+    }
 
     public bool Toggle()
     {

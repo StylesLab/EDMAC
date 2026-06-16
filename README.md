@@ -269,6 +269,8 @@ MIDI note lengths. Track note lengths are still controlled by each track's
 | `channel` | No | `0` | MIDI channel, from 0 through 15 |
 | `velocity` | No | `127` | Note velocity, from 1 through 127 |
 | `amp` | No | `1.0` | Linear output gain for this track |
+| `enabled` | No | `true` | Whether the track starts enabled |
+| `status` | No | `enabled` | Alternative startup state: `enabled` or `disabled` |
 | `effects` | No | none | Per-track effect chain |
 | `map` | Yes | - | Pattern-symbol mappings |
 | `patterns` | Yes | - | One or more simultaneous pattern lanes |
@@ -287,6 +289,21 @@ precedence over `pattern:`.
 
 Each track must specify exactly one audio source: either `soundfont` or
 `sample`.
+
+Startup state can be controlled with either `enabled`:
+
+```yaml
+enabled: false
+```
+
+or `status`:
+
+```yaml
+status: disabled
+```
+
+If neither is present, the track starts enabled. If both are present,
+`enabled` takes precedence.
 
 ### SoundFont Paths
 
@@ -638,6 +655,8 @@ control: f1
 - Muting immediately stops its current notes.
 - The pattern timing continues while muted.
 - Re-enabling rejoins the pattern at its current position.
+- Tracks that start with `enabled: false` or `status: disabled` are enabled
+  by pressing their function key.
 
 Progression controls select or cycle progressions:
 
@@ -785,6 +804,7 @@ Before playback, confirm:
 
 - `bpm` is greater than zero.
 - Every track has a name, SoundFont, map, pattern, beats value, and control.
+- Tracks that should start muted use `enabled: false` or `status: disabled`.
 - Every pattern symbol is mapped.
 - Absolute notes are in MIDI range 0 through 127.
 - Relative mappings have at least one progression.
