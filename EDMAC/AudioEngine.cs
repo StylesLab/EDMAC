@@ -1,4 +1,5 @@
 using System.Runtime.InteropServices;
+using EDMAC.Effects;
 using NAudio.Wave;
 
 namespace EDMAC;
@@ -11,15 +12,20 @@ public sealed class AudioEngine : IWaveProvider, IDisposable
     private const int RenderBlockFrames = 64;
 
     private readonly IInstrument[] instruments;
+    private readonly IAudioEffect[][] effects;
     private readonly float[] renderLeft = new float[RenderBlockFrames];
     private readonly float[] renderRight = new float[RenderBlockFrames];
     private readonly WaveOutEvent output;
     private long samplePosition;
     private bool disposed;
 
-    public AudioEngine(IInstrument[] instruments, int sampleRate)
+    public AudioEngine(
+        IInstrument[] instruments,
+        IAudioEffect[][] effects,
+        int sampleRate)
     {
         this.instruments = instruments;
+        this.effects = effects;
         WaveFormat = WaveFormat.CreateIeeeFloatWaveFormat(sampleRate, Channels);
         output = new WaveOutEvent
         {
@@ -63,11 +69,17 @@ public sealed class AudioEngine : IWaveProvider, IDisposable
             Span<float> right = renderRight.AsSpan(0, frames);
             Span<float> destination = outputSamples.Slice(frameOffset * Channels, frames * Channels);
 
-            foreach (IInstrument instrument in instruments)
+            for (var instrumentIndex = 0; instrumentIndex < instruments.Length; instrumentIndex++)
             {
+                IInstrument instrument = instruments[instrumentIndex];
                 left.Clear();
                 right.Clear();
                 instrument.Render(left, right);
+
+                foreach (IAudioEffect effect in effects[instrumentIndex])
+                {
+                    effect.Process(left, right);
+                }
 
                 for (var frame = 0; frame < frames; frame++)
                 {

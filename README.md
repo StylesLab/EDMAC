@@ -260,6 +260,7 @@ MIDI note lengths. Track note lengths are still controlled by each track's
 | `channel` | No | `0` | MIDI channel, from 0 through 15 |
 | `velocity` | No | `127` | Note velocity, from 1 through 127 |
 | `amp` | No | `1.0` | Linear output gain for this track |
+| `effects` | No | none | Per-track effect chain |
 | `map` | Yes | - | Pattern-symbol mappings |
 | `patterns` | Yes | - | One or more simultaneous pattern lanes |
 | `beats` | Yes | - | Number of steps per four-beat bar |
@@ -370,6 +371,83 @@ Common values:
 
 The value must be finite and non-negative. Values above `1.0` are allowed but
 can clip when loud tracks are mixed together.
+
+### `effects`
+
+Each track can have an optional effect chain. Effects are processed in the
+order they appear, after the instrument renders and before `amp` is applied:
+
+```yaml
+effects:
+  - type: reverb
+    mix: 0.25
+    room: 0.8
+
+  - type: delay
+    time: dotted-eighth
+    feedback: 0.35
+    mix: 0.25
+
+  - type: stereoWidth
+    width: 1.4
+```
+
+Supported effect types:
+
+| Type | Purpose |
+| --- | --- |
+| `reverb` | Room, hall, and atmosphere |
+| `delay` or `echo` | Rhythmic repeats |
+| `lowpass` | Removes highs |
+| `highpass` | Removes lows |
+| `bandpass` | Narrows the signal to a frequency band |
+| `chorus` | Thickens synths and pads |
+| `flanger` | Short modulated delay with feedback |
+| `phaser` | Swirling all-pass modulation |
+| `stereoWidth` | Mid/side stereo widening |
+
+Common parameters:
+
+| Parameter | Used by | Meaning |
+| --- | --- | --- |
+| `mix` | reverb, delay, chorus, flanger, phaser | Wet/dry amount from `0` to `1` |
+| `feedback` | delay, chorus, flanger, phaser | Repeat or resonance amount |
+| `room` | reverb | Reverb size from small to large |
+| `damp` | reverb | High-frequency damping |
+| `time` | delay | `quarter`, `eighth`, `dotted-eighth`, `sixteenth`, or milliseconds |
+| `cutoff` | filters | Frequency in Hz |
+| `q` | filters | Resonance / bandwidth |
+| `from` / `to` | filters | Sweep start and end cutoff in Hz |
+| `durationBeats` | filters | Sweep duration in quarter-note beats |
+| `rateHz` | chorus, flanger, phaser | Modulation speed |
+| `delayMs` | chorus, flanger | Base delay time |
+| `depthMs` | chorus, flanger | Modulation depth |
+| `depth` | phaser | Modulation depth |
+| `width` | stereoWidth | `1` is unchanged, above `1` is wider, `0` is mono |
+
+Filter sweep example:
+
+```yaml
+effects:
+  - type: lowpass
+    from: 300
+    to: 8000
+    durationBeats: 16
+    q: 0.8
+```
+
+Delay values are tempo-synced unless you provide a number, which is treated as
+milliseconds:
+
+```yaml
+effects:
+  - type: delay
+    time: quarter
+  - type: delay
+    time: 375
+```
+
+Effects are lightweight built-in DSP modules. They are not VST plugins.
 
 ## Patterns
 

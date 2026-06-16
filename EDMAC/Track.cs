@@ -1,5 +1,7 @@
 namespace EDMAC;
 
+using EDMAC.Effects;
+
 public sealed class Track
 {
     private int enabled = 1;
@@ -23,6 +25,8 @@ public sealed class Track
     public required int Velocity { get; init; }
 
     public required float Amp { get; init; }
+
+    public required IReadOnlyList<TrackEffectSettings> Effects { get; init; }
 
     public required ConsoleKey Control { get; init; }
 

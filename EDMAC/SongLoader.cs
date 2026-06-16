@@ -1,4 +1,5 @@
 using System.Collections;
+using EDMAC.Effects;
 using YamlDotNet.Serialization;
 using YamlDotNet.Serialization.NamingConventions;
 
@@ -39,6 +40,7 @@ public static class SongLoader
         }
 
         ValidateResolvedMappings(tracks, progressions);
+        ValidateEffects(tracks, sampleRate, definition.Bpm);
 
         return new Song
         {
@@ -47,6 +49,26 @@ public static class SongLoader
             Progressions = progressions,
             Tracks = tracks
         };
+    }
+
+    private static void ValidateEffects(
+        IReadOnlyList<Track> tracks,
+        int sampleRate,
+        double bpm)
+    {
+        foreach (Track track in tracks)
+        {
+            try
+            {
+                EffectFactory.CreateEffects(track.Effects, sampleRate, bpm);
+            }
+            catch (Exception exception)
+            {
+                throw new InvalidDataException(
+                    $"Track '{track.Name}' effect configuration is invalid: {exception.Message}",
+                    exception);
+            }
+        }
     }
 
     private static void ValidateResolvedMappings(
@@ -248,10 +270,45 @@ public static class SongLoader
             Channel = definition.Channel,
             Velocity = definition.Velocity,
             Amp = definition.Amp,
+            Effects = ParseEffects(definition.Name, definition.Effects),
             Control = control,
             NoteMappings = mappings,
             Patterns = patterns
         };
+    }
+
+    private static IReadOnlyList<TrackEffectSettings> ParseEffects(
+        string trackName,
+        IReadOnlyList<Dictionary<string, object>> definitions)
+    {
+        var effects = new List<TrackEffectSettings>(definitions.Count);
+
+        foreach (Dictionary<string, object> definition in definitions)
+        {
+            var parameters = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+
+            foreach ((string key, object value) in definition)
+            {
+                parameters[key] = value?.ToString() ?? string.Empty;
+            }
+
+            if (!parameters.TryGetValue("type", out string? type) ||
+                string.IsNullOrWhiteSpace(type))
+            {
+                throw new InvalidDataException(
+                    $"Track '{trackName}' has an effect without a type.");
+            }
+
+            parameters.Remove("type");
+
+            effects.Add(new TrackEffectSettings
+            {
+                Type = type,
+                Parameters = parameters
+            });
+        }
+
+        return effects;
     }
 
     private static SampleRootNote ParseSampleRootNote(
@@ -464,6 +521,8 @@ public static class SongLoader
         public int Velocity { get; set; } = 127;
 
         public float Amp { get; set; } = 1.0f;
+
+        public List<Dictionary<string, object>> Effects { get; set; } = [];
 
         public List<Dictionary<string, object>> Map { get; set; } = [];
 

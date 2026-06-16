@@ -1,4 +1,5 @@
 using System.Threading.Channels;
+using EDMAC.Effects;
 
 namespace EDMAC;
 
@@ -7,6 +8,7 @@ public sealed class Player : IDisposable
     private readonly Song song;
     private readonly IInstrument[] instruments;
     private readonly AudioEngine audioEngine;
+    private readonly IAudioEffect[][] effects;
     private readonly Channel<ScheduledTrackNote> noteQueue;
     private readonly bool printStartupDiagnostics;
     private bool disposed;
@@ -18,8 +20,14 @@ public sealed class Player : IDisposable
         instruments = song.Tracks
             .Select(track => InstrumentFactory.Create(track, song.SampleRate))
             .ToArray();
+        effects = song.Tracks
+            .Select(track => EffectFactory.CreateEffects(
+                track.Effects,
+                song.SampleRate,
+                song.Bpm))
+            .ToArray();
 
-        audioEngine = new AudioEngine(instruments, song.SampleRate);
+        audioEngine = new AudioEngine(instruments, effects, song.SampleRate);
         noteQueue = Channel.CreateBounded<ScheduledTrackNote>(
             new BoundedChannelOptions(1024)
             {
@@ -165,6 +173,7 @@ public sealed class Player : IDisposable
                 $"PatternLengths={string.Join(",", track.Patterns.Select(pattern => pattern.Length))}");
             Console.WriteLine($"SamplesPerStep={track.TimingPattern.SamplesPerStep}");
             Console.WriteLine($"Amp={track.Amp}");
+            Console.WriteLine($"Effects={track.Effects.Count}");
         }
 
         if (song.ActiveProgression is not null)

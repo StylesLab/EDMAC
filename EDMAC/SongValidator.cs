@@ -33,6 +33,7 @@ public static class SongValidator
 
             Console.WriteLine($"SamplesPerStep={track.TimingPattern.SamplesPerStep}");
             Console.WriteLine($"Amp={track.Amp}");
+            Console.WriteLine($"Effects={string.Join(",", track.Effects.Select(effect => effect.Type))}");
             Console.WriteLine($"Control={track.Control}");
             Console.WriteLine("NoteMappings:");
 
