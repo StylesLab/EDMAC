@@ -80,7 +80,7 @@ public sealed class Player : IDisposable
         ChordProgression? progression = song.CycleProgression(key);
         if (progression is not null)
         {
-            Console.WriteLine($"Progression={progression.Name}");
+            ConsoleUi.Control($"Progression={progression.Name}");
         }
 
         for (var trackIndex = 0; trackIndex < song.Tracks.Count; trackIndex++)
@@ -97,7 +97,7 @@ public sealed class Player : IDisposable
                 instruments[trackIndex].StopChannel(track.Channel);
             }
 
-            Console.WriteLine($"{track.Name} {(enabled ? "enabled" : "muted")}");
+            ConsoleUi.Track(track.Name, enabled ? "enabled" : "muted");
         }
     }
 
@@ -165,19 +165,20 @@ public sealed class Player : IDisposable
     {
         foreach (Track track in song.Tracks)
         {
-            Console.WriteLine($"Track={track.Name}");
-            Console.WriteLine($"Instrument={track.InstrumentKind}");
-            Console.WriteLine($"Patterns={track.Patterns.Count}");
-            Console.WriteLine(
-                $"PatternLengths={string.Join(",", track.Patterns.Select(pattern => pattern.Length))}");
-            Console.WriteLine($"SamplesPerStep={track.TimingPattern.SamplesPerStep}");
-            Console.WriteLine($"Amp={track.Amp}");
-            Console.WriteLine($"Effects={track.Effects.Count}");
+            ConsoleUi.KeyValue("Track", track.Name);
+            ConsoleUi.KeyValue("Instrument", track.InstrumentKind.ToString());
+            ConsoleUi.KeyValue("Patterns", track.Patterns.Count.ToString());
+            ConsoleUi.KeyValue(
+                "PatternLengths",
+                string.Join(",", track.Patterns.Select(pattern => pattern.Length)));
+            ConsoleUi.KeyValue("SamplesPerStep", track.TimingPattern.SamplesPerStep.ToString());
+            ConsoleUi.KeyValue("Amp", track.Amp.ToString());
+            ConsoleUi.KeyValue("Effects", track.Effects.Count.ToString());
         }
 
         if (song.ActiveProgression is not null)
         {
-            Console.WriteLine($"Progression={song.ActiveProgression.Name}");
+            ConsoleUi.KeyValue("Progression", song.ActiveProgression.Name);
         }
     }
 }

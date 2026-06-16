@@ -10,7 +10,9 @@ public sealed class HotReloadingPlayer
     private Player? currentPlayer;
     private CancellationTokenSource? currentPlaybackCancellation;
     private Task? currentPlaybackTask;
+    private Song? currentSong;
     private bool hasLoadedOnce;
+    private bool paused = true;
 
     public HotReloadingPlayer(string yamlPath)
     {
@@ -26,8 +28,10 @@ public sealed class HotReloadingPlayer
 
     public async Task RunAsync()
     {
-        Console.WriteLine("Press the configured function keys to toggle tracks. Press Escape to stop.");
-        Console.WriteLine("Editing the YAML file will reload it and restart playback.");
+        ConsoleUi.Banner();
+        ConsoleUi.Info("Press Space to start. Space pauses/resumes. R restart. Q or Escape quit.");
+        ConsoleUi.Info("Function keys toggle tracks and progressions.");
+        ConsoleUi.Info("Editing the YAML file will reload it and restart playback.");
 
         using var hostCancellation = new CancellationTokenSource();
         using FileSystemWatcher watcher = CreateWatcher();
@@ -101,7 +105,16 @@ public sealed class HotReloadingPlayer
         }
         catch (Exception exception)
         {
-            Console.Error.WriteLine($"Reload failed: {exception.Message}");
+            ConsoleUi.Error($"Reload failed: {exception.Message}");
+            return;
+        }
+
+        currentSong = song;
+
+        if (paused)
+        {
+            hasLoadedOnce = true;
+            ConsoleUi.Success($"Loaded {Path.GetFileName(yamlPath)}. Press Space to play.");
             return;
         }
 
@@ -109,23 +122,28 @@ public sealed class HotReloadingPlayer
 
         try
         {
-            var nextPlayer = new Player(song, printStartupDiagnostics: !hasLoadedOnce);
-            var nextCancellation = new CancellationTokenSource();
-            Task nextTask = nextPlayer.RunAsync(nextCancellation.Token);
-
-            lock (playerLock)
-            {
-                currentPlayer = nextPlayer;
-                currentPlaybackCancellation = nextCancellation;
-                currentPlaybackTask = nextTask;
-            }
+            StartPlayer(song, printStartupDiagnostics: !hasLoadedOnce);
 
             hasLoadedOnce = true;
-            Console.WriteLine($"Reloaded {Path.GetFileName(yamlPath)}");
+            ConsoleUi.Success($"Reloaded {Path.GetFileName(yamlPath)}");
         }
         catch (Exception exception)
         {
-            Console.Error.WriteLine($"Reload failed: {exception.Message}");
+            ConsoleUi.Error($"Reload failed: {exception.Message}");
+        }
+    }
+
+    private void StartPlayer(Song song, bool printStartupDiagnostics)
+    {
+        var nextPlayer = new Player(song, printStartupDiagnostics);
+        var nextCancellation = new CancellationTokenSource();
+        Task nextTask = nextPlayer.RunAsync(nextCancellation.Token);
+
+        lock (playerLock)
+        {
+            currentPlayer = nextPlayer;
+            currentPlaybackCancellation = nextCancellation;
+            currentPlaybackTask = nextTask;
         }
     }
 
@@ -174,9 +192,21 @@ public sealed class HotReloadingPlayer
             }
 
             ConsoleKey key = Console.ReadKey(intercept: true).Key;
-            if (key == ConsoleKey.Escape)
+            if (key is ConsoleKey.Escape or ConsoleKey.Q)
             {
                 return;
+            }
+
+            if (key == ConsoleKey.Spacebar)
+            {
+                await TogglePlayPauseAsync();
+                continue;
+            }
+
+            if (key == ConsoleKey.R)
+            {
+                await RestartAsync();
+                continue;
             }
 
             Player? player;
@@ -187,5 +217,40 @@ public sealed class HotReloadingPlayer
 
             player?.HandleKey(key);
         }
+    }
+
+    private async Task TogglePlayPauseAsync()
+    {
+        if (paused)
+        {
+            if (currentSong is null)
+            {
+                ConsoleUi.Warning("No song is loaded.");
+                return;
+            }
+
+            StartPlayer(currentSong, printStartupDiagnostics: false);
+            paused = false;
+            ConsoleUi.Control("Play");
+            return;
+        }
+
+        await StopCurrentPlayerAsync();
+        paused = true;
+        ConsoleUi.Control("Pause");
+    }
+
+    private async Task RestartAsync()
+    {
+        if (currentSong is null)
+        {
+            ConsoleUi.Warning("No song is loaded.");
+            return;
+        }
+
+        await StopCurrentPlayerAsync();
+        StartPlayer(currentSong, printStartupDiagnostics: false);
+        paused = false;
+        ConsoleUi.Control("Restart");
     }
 }

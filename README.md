@@ -44,7 +44,16 @@ EDMAC\bin\Debug\net8.0\edmac.exe song.yml
 EDMAC\bin\Debug\net8.0\edmac.exe validate song.yml
 ```
 
-Press `Escape` during playback to stop.
+Playback loads the YAML and waits for you to press `Space` before starting.
+
+Playback keys:
+
+| Key | Action |
+| --- | --- |
+| `Space` | Play / pause |
+| `R` | Restart playback from the beginning |
+| `Q` | Quit |
+| `Escape` | Quit |
 
 Playback mode watches the YAML file. When the file is edited and saved, EDMAC
 reloads it and restarts playback. If the edited YAML is invalid, the current
@@ -608,6 +617,15 @@ validates every relative mapping against every chord and rejects notes that
 would fall outside MIDI range 0 through 127.
 
 ## Live Controls
+
+Global transport controls:
+
+| Key | Action |
+| --- | --- |
+| `Space` | Toggle play/pause |
+| `R` | Restart the current song from the beginning |
+| `Q` | Quit playback |
+| `Escape` | Quit playback |
 
 Track controls toggle mute state:
 

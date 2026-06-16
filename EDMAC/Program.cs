@@ -26,7 +26,7 @@ internal static class Program
         }
         catch (Exception exception)
         {
-            Console.Error.WriteLine($"Error: {exception.Message}");
+            ConsoleUi.Error(exception.Message);
             return 1;
         }
     }
