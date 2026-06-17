@@ -11,6 +11,7 @@ public sealed class Player : IDisposable
     private readonly IAudioEffect[][] effects;
     private readonly Channel<ScheduledTrackNote> noteQueue;
     private readonly bool printStartupDiagnostics;
+    private readonly bool[] previousTrackEnabledStates;
     private bool disposed;
 
     public Player(Song song, bool printStartupDiagnostics = true)
@@ -28,6 +29,7 @@ public sealed class Player : IDisposable
                 song.SampleRate,
                 song.Bpm))
             .ToArray();
+        previousTrackEnabledStates = new bool[song.Tracks.Count];
 
         audioEngine = new AudioEngine(instruments, effects, song.SampleRate);
         noteQueue = Channel.CreateBounded<ScheduledTrackNote>(
@@ -35,7 +37,7 @@ public sealed class Player : IDisposable
             {
                 FullMode = BoundedChannelFullMode.DropWrite,
                 SingleReader = true,
-                SingleWriter = true
+                SingleWriter = false
             });
 
     }
@@ -100,23 +102,30 @@ public sealed class Player : IDisposable
 
     private void ApplyTrackControl(ConsoleKey key)
     {
-        bool[] wasEnabled = song.Tracks
-            .Select(track => track.Enabled)
-            .ToArray();
+        for (var trackIndex = 0; trackIndex < song.Tracks.Count; trackIndex++)
+        {
+            previousTrackEnabledStates[trackIndex] = song.Tracks[trackIndex].Enabled;
+        }
 
         song.ApplyTrackControl(key);
-        ConsoleUi.Control($"Tracks={key}");
 
         for (var trackIndex = 0; trackIndex < song.Tracks.Count; trackIndex++)
         {
             Track track = song.Tracks[trackIndex];
-            if (wasEnabled[trackIndex] && !track.Enabled)
+            if (previousTrackEnabledStates[trackIndex] && !track.Enabled)
             {
-                instruments[trackIndex].StopChannel(track.Channel);
+                noteQueue.Writer.TryWrite(new ScheduledTrackNote(
+                    trackIndex,
+                    new ScheduledNote(
+                        audioEngine.SamplePosition,
+                        track.Channel,
+                        0,
+                        0),
+                    ScheduledNoteKind.NoteOffAll));
             }
-
-            ConsoleUi.Track(track.Name, track.Enabled ? "enabled" : "muted");
         }
+
+        ConsoleUi.Control($"Tracks={key} enabled={FormatEnabledTracks()}");
     }
 
     public (bool IsRecording, string? Path) ToggleRecording(string recordingsDirectory)
@@ -259,5 +268,14 @@ public sealed class Player : IDisposable
         return controls.Count == 0
             ? "(always)"
             : string.Join(",", controls.Order());
+    }
+
+    private string FormatEnabledTracks()
+    {
+        return string.Join(
+            ",",
+            song.Tracks
+                .Where(track => track.Enabled)
+                .Select(track => track.Name));
     }
 }
