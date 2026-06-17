@@ -29,7 +29,7 @@ public sealed class HotReloadingPlayer
     public async Task RunAsync()
     {
         ConsoleUi.Banner();
-        ConsoleUi.Info("Press Space to start. Space pauses/resumes. R restart. Q or Escape quit.");
+        ConsoleUi.Info("Press Space to start. Space pauses/resumes. H restart. R record. Q or Escape quit.");
         ConsoleUi.Info("Function keys toggle tracks and progressions.");
         ConsoleUi.Info("Editing the YAML file will reload it and restart playback.");
 
@@ -226,9 +226,15 @@ public sealed class HotReloadingPlayer
             return;
         }
 
-        if (key == ConsoleKey.R)
+        if (key == ConsoleKey.H)
         {
             await RestartAsync();
+            return;
+        }
+
+        if (key == ConsoleKey.R)
+        {
+            ToggleRecording();
             return;
         }
 
@@ -274,5 +280,31 @@ public sealed class HotReloadingPlayer
         StartPlayer(currentSong, printStartupDiagnostics: false);
         paused = false;
         ConsoleUi.Control("Restart");
+    }
+
+    private void ToggleRecording()
+    {
+        Player? player;
+        lock (playerLock)
+        {
+            player = currentPlayer;
+        }
+
+        if (player is null)
+        {
+            ConsoleUi.Warning("Start playback before recording.");
+            return;
+        }
+
+        string recordingsDirectory = Path.Combine(AppContext.BaseDirectory, "recordings");
+        (bool isRecording, string? path) = player.ToggleRecording(recordingsDirectory);
+
+        if (isRecording)
+        {
+            ConsoleUi.Control($"Record on -> {path}");
+            return;
+        }
+
+        ConsoleUi.Control(path is null ? "Record off" : $"Record off -> {path}");
     }
 }

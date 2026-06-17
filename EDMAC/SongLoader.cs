@@ -238,10 +238,10 @@ public static class SongLoader
         Dictionary<char, NoteMapping> mappings = ParseMappings(definition, hasProgressions);
         ConsoleKey control = ParseControl(definition.Control, $"Track '{definition.Name}'");
         string? soundFontPath = hasSoundFont
-            ? Path.GetFullPath(definition.Soundfont, songDirectory)
+            ? ResolveAssetPath(definition.Soundfont, songDirectory)
             : null;
         string? samplePath = hasSample
-            ? Path.GetFullPath(definition.Sample, songDirectory)
+            ? ResolveAssetPath(definition.Sample, songDirectory)
             : null;
         SampleRootNote? sampleRootNote = hasSample
             ? ParseSampleRootNote(definition, samplePath!)
@@ -277,6 +277,13 @@ public static class SongLoader
             NoteMappings = mappings,
             Patterns = patterns
         };
+    }
+
+    private static string ResolveAssetPath(string path, string songDirectory)
+    {
+        return Path.IsPathFullyQualified(path)
+            ? Path.GetFullPath(path)
+            : Path.GetFullPath(path, songDirectory);
     }
 
     private static bool ParseInitialEnabled(TrackDefinition definition)

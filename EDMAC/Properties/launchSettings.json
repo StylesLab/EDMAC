@@ -2,7 +2,7 @@
   "profiles": {
     "EDMAC": {
       "commandName": "Project",
-      "commandLineArgs": "song.yml"
+      "commandLineArgs": ".\\example\\song.yml"
     }
   }
 }

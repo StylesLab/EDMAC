@@ -106,6 +106,16 @@ public sealed class Player : IDisposable
         }
     }
 
+    public (bool IsRecording, string? Path) ToggleRecording(string recordingsDirectory)
+    {
+        if (audioEngine.IsRecording)
+        {
+            return (false, audioEngine.StopRecording());
+        }
+
+        return (true, audioEngine.StartRecording(recordingsDirectory));
+    }
+
     public void Dispose()
     {
         if (disposed)

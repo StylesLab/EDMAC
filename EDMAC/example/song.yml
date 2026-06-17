@@ -18,11 +18,12 @@ progressions:
     control: f10
   
 tracks:
-
+  
   - name: kick
-    soundfont: D:\soundfonts\Electrokit-New-Sharp.sf2
+    sample: '.\TR 909 Kick 01.wav'
+    sampleNote: c4
     map:
-     - x: 36
+      - x: 60
     patterns:
       - x|x|x|x
     beats: 4
@@ -31,9 +32,10 @@ tracks:
     status: enabled
 
   - name: snare
-    soundfont:  D:\soundfonts\Electrokit-New-Sharp.sf2
+    sample: '.\Techno Snare 01.wav'
+    sampleNote: c4
     map:
-     - x: 38
+      - x: 60
     patterns:
       - ....x.......x...|....x.......x.xx
     beats: 16
@@ -41,11 +43,22 @@ tracks:
     control: f2
     status: disabled
 
+  
+  - name: hat
+    sample: '.\Techno Closed Hat 01.wav'
+    sampleNote: c4
+    map:
+      - x: 60
+    patterns:
+      - xx.xxx.xxx.xxx.x
+    beats: 16
+    amp: 0.38
+    control: f4
+    status: disabled
+
   - name: chords
-    soundfont: D:\soundfonts\ColomboGMGS2.sf2
-    bank: 0
-    program: 52
-    channel: 0
+    sample: '.\80s_JupiPoly_C2.wav'
+    sampleNote: c2
     map:
      - x: [3,4,5]     
     patterns:
@@ -56,10 +69,8 @@ tracks:
     status: disabled
   
   - name: bass
-    soundfont: D:\soundfonts\ColomboGMGS2.sf2
-    bank: 3
-    program: 38
-    channel: 0
+    sample: '.\80s_MatrixBassA-C2.wav'
+    sampleNote: c2
     map:
      - x: [-3]
      - y: [0]
@@ -83,8 +94,8 @@ tracks:
     status: disabled
 
   - name: lead
-    sample: D:\samples\80s Synths Samples\Multisamples\Matrix Poly\80s_MatrixPoly_C1.wav
-    sampleNote: c4
+    sample: '.\Super Saw C4.wav'
+    sampleNote: c6
     map:
      - b: [5]
      - a: [7]
@@ -109,8 +120,8 @@ tracks:
     status: disabled
 
   - name: arp
-    sample: D:\samples\Deeper House\Instruments\RushArp\DH_RushArp-C4.wav
-    sampleNote: c4
+    sample: '.\Arp E C4.wav'
+    sampleNote: c3
     map:
        - a: [0]   
        - b: [1]       
@@ -137,7 +148,7 @@ tracks:
     status: disabled
 
   - name: fx
-    sample: D:\samples\Essential Drumkits\Drum & Bass Kit\D&B Drop FX 01.wav    
+    sample: '.\D&B Drop FX 01.wav'
     sampleNote: c
     map:     
      - x: [0]     

@@ -16,6 +16,7 @@ public sealed class AudioEngine : IWaveProvider, IDisposable
     private readonly float[] renderLeft = new float[RenderBlockFrames];
     private readonly float[] renderRight = new float[RenderBlockFrames];
     private readonly WaveOutEvent output;
+    private readonly AudioRecorder recorder;
     private long samplePosition;
     private bool disposed;
 
@@ -32,12 +33,15 @@ public sealed class AudioEngine : IWaveProvider, IDisposable
             DesiredLatency = 100,
             NumberOfBuffers = 3
         };
+        recorder = new AudioRecorder(WaveFormat);
         output.Init(this);
     }
 
     public WaveFormat WaveFormat { get; }
 
     public long SamplePosition => Interlocked.Read(ref samplePosition);
+
+    public bool IsRecording => recorder.IsRecording;
 
     public void Start()
     {
@@ -51,6 +55,17 @@ public sealed class AudioEngine : IWaveProvider, IDisposable
         {
             output.Stop();
         }
+    }
+
+    public string StartRecording(string recordingsDirectory)
+    {
+        ObjectDisposedException.ThrowIf(disposed, this);
+        return recorder.Start(recordingsDirectory);
+    }
+
+    public string? StopRecording()
+    {
+        return recorder.Stop();
     }
 
     public int Read(byte[] buffer, int offset, int count)
@@ -93,6 +108,7 @@ public sealed class AudioEngine : IWaveProvider, IDisposable
             Interlocked.Add(ref samplePosition, frames);
         }
 
+        recorder.Capture(buffer, offset, count);
         return count;
     }
 
@@ -106,6 +122,7 @@ public sealed class AudioEngine : IWaveProvider, IDisposable
         disposed = true;
         output.Stop();
         output.Dispose();
+        recorder.Dispose();
 
         foreach (IInstrument instrument in instruments)
         {
