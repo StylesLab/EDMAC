@@ -17,7 +17,7 @@ EDMAC uses:
 
 - Windows
 - .NET 10 SDK or runtime
-- One or more `.sf2` SoundFont or sammple files
+- One or more `.sf2` SoundFont or sample files
 
 ## Finding Sounds
 
@@ -38,21 +38,25 @@ dotnet build EDMAC\EDMAC.csproj
 Play a song:
 
 ```powershell
-dotnet run --project EDMAC\EDMAC.csproj -- EDMAC\song.yml
+dotnet run --project EDMAC\EDMAC.csproj -- EDMAC\example\song.yml
 ```
 
 Validate a song without starting audio:
 
 ```powershell
-dotnet run --project EDMAC\EDMAC.csproj -- validate EDMAC\song.yml
+dotnet run --project EDMAC\EDMAC.csproj -- validate EDMAC\example\song.yml
 ```
 
 When running the built executable directly:
 
 ```powershell
-EDMAC\bin\Debug\net8.0\edmac.exe song.yml
-EDMAC\bin\Debug\net8.0\edmac.exe validate song.yml
+EDMAC\bin\Debug\net10.0\edmac.exe EDMAC\example\song.yml
+EDMAC\bin\Debug\net10.0\edmac.exe validate EDMAC\example\song.yml
 ```
+
+The repository includes a commented showcase song at
+`EDMAC\example\song.yml`. It demonstrates SoundFonts, samples, chord-relative
+mappings, Tie Steps, track groups, progressions, and effects.
 
 Playback loads the YAML and waits for you to press `Space` before starting.
 
