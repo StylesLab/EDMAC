@@ -2,6 +2,9 @@ namespace EDMAC;
 
 public sealed class Pattern
 {
+    public const char RestSymbol = '.';
+    public const char TieSymbol = '>';
+
     public Pattern(string source, int beats, int sampleRate, double bpm)
     {
         Steps = new string(source.Where(character => character != '|').ToArray());
@@ -37,6 +40,11 @@ public sealed class Pattern
     public char GetSymbol(long absoluteStep)
     {
         return Steps[(int)(absoluteStep % Length)];
+    }
+
+    public bool IsTieStep(long absoluteStep)
+    {
+        return GetSymbol(absoluteStep) == TieSymbol;
     }
 
     public long GetSamplePosition(long absoluteStep)

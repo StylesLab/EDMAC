@@ -79,7 +79,8 @@ public static class SongValidator
             foreach (Pattern pattern in track.Patterns)
             {
                 char symbol = pattern.GetSymbol(absoluteStep);
-                if (symbol == '.' ||
+                if (symbol == Pattern.RestSymbol ||
+                    symbol == Pattern.TieSymbol ||
                     !track.NoteMappings.TryGetValue(symbol, out NoteMapping? mapping))
                 {
                     continue;

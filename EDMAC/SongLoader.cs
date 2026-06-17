@@ -460,7 +460,9 @@ public static class SongLoader
         {
             foreach (char symbol in pattern.Steps)
             {
-                if (symbol != '.' && !mappings.ContainsKey(symbol))
+                if (symbol != Pattern.RestSymbol &&
+                    symbol != Pattern.TieSymbol &&
+                    !mappings.ContainsKey(symbol))
                 {
                     throw new InvalidDataException(
                         $"Track '{trackName}' pattern uses unmapped symbol '{symbol}'.");

@@ -506,10 +506,11 @@ Pattern rules:
 
 - `|` is visual formatting and is removed before playback.
 - `.` is a rest.
+- `>` is a Tie Step that extends the previous note through this step.
 - Any other character must exist in the track's `map`.
 - Patterns loop indefinitely.
 - Mapping symbols must be exactly one character.
-- `.` and `|` cannot be mapping symbols.
+- `.`, `>`, and `|` cannot be mapping symbols.
 
 For example:
 
@@ -556,6 +557,29 @@ beats: 1
 At every track step boundary, EDMAC releases that track's currently sounding
 notes and then starts the notes mapped at the new step. A note therefore lasts
 for at most one track step, although a SoundFont envelope may decay sooner.
+
+### Tie Steps
+
+Tie Steps let a note continue across one or more following pattern steps. Use
+`>` immediately after a mapped symbol:
+
+```yaml
+map:
+  - x: [9]
+  - z: [8]
+patterns:
+  - ..x>..z>
+beats: 8
+```
+
+In this example, `x` plays at its step and keeps ringing through the `>` step.
+The same happens for `z`. A chain such as `x>>>` holds the note across three
+continuation steps.
+
+Tie Steps occupy real pattern time. They are not removed like `|`, and they do
+not trigger notes themselves. On a Tie Step, EDMAC skips the normal track
+release, allowing currently sounding notes on that track to continue until the
+next non-tie step or until the track is muted.
 
 ### Multiple Pattern Lanes
 
@@ -796,8 +820,16 @@ EDMAC does not force drum-channel conventions.
 
 ### A note stops too early
 
-Notes are released at the next track step. Use a lower `beats` value or a
-single-step pattern to increase their duration:
+Notes are released at the next non-tie track step. Use Tie Steps, a lower
+`beats` value, or a single-step pattern to increase their duration:
+
+```yaml
+patterns:
+  - z>>>
+beats: 4
+```
+
+For a whole-bar note, a single-step pattern is often simpler:
 
 ```yaml
 patterns:
@@ -828,7 +860,7 @@ Before playback, confirm:
 - `bpm` is greater than zero.
 - Every track has a name, SoundFont, map, pattern, beats value, and control.
 - Tracks that should start muted use `enabled: false` or `status: disabled`.
-- Every pattern symbol is mapped.
+- Every pattern symbol except `.`, `>`, and `|` is mapped.
 - Absolute notes are in MIDI range 0 through 127.
 - Relative mappings have at least one progression.
 - Chord names use supported major/minor triad syntax.

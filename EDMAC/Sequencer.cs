@@ -45,15 +45,19 @@ public sealed class Sequencer
 
                     lastAbsoluteSteps[trackIndex] = absoluteStep;
                     long stepSamplePosition = timingPattern.GetSamplePosition(absoluteStep);
+                    bool isTieStep = track.Patterns.Any(pattern => pattern.IsTieStep(absoluteStep));
 
-                    writer.TryWrite(new ScheduledTrackNote(
-                        trackIndex,
-                        new ScheduledNote(
-                            stepSamplePosition,
-                            track.Channel,
-                            0,
-                            0),
-                        ScheduledNoteKind.NoteOffAll));
+                    if (!isTieStep)
+                    {
+                        writer.TryWrite(new ScheduledTrackNote(
+                            trackIndex,
+                            new ScheduledNote(
+                                stepSamplePosition,
+                                track.Channel,
+                                0,
+                                0),
+                            ScheduledNoteKind.NoteOffAll));
+                    }
 
                     if (!track.Enabled)
                     {
@@ -65,7 +69,8 @@ public sealed class Sequencer
                     foreach (Pattern pattern in track.Patterns)
                     {
                         char symbol = pattern.GetSymbol(absoluteStep);
-                        if (symbol == '.' ||
+                        if (symbol == Pattern.RestSymbol ||
+                            symbol == Pattern.TieSymbol ||
                             !track.NoteMappings.TryGetValue(symbol, out NoteMapping? mapping))
                         {
                             continue;
