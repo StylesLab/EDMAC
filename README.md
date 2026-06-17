@@ -51,9 +51,13 @@ Playback keys:
 | Key | Action |
 | --- | --- |
 | `Space` | Play / pause |
-| `R` | Restart playback from the beginning |
+| `H` | Restart playback from the beginning |
+| `R` | Start / stop recording the mixed output to WAV |
 | `Q` | Quit |
 | `Escape` | Quit |
+
+Recordings are written under a `recordings` folder beside the running app and
+are date/time stamped, for example `recordings/edmac-20260616-213045-123.wav`.
 
 Playback mode watches the YAML file. When the file is edited and saved, EDMAC
 reloads it and restarts playback. If the edited YAML is invalid, the current
@@ -322,6 +326,12 @@ soundfont: ./soundfonts/drums.sf2
 Single quotes are recommended for Windows paths so backslashes are treated
 literally.
 
+This also works with Windows-style relative paths:
+
+```yaml
+soundfont: '.\soundfonts\drums.sf2'
+```
+
 EDMAC does not assume General MIDI or channel 10 drums. `bank`, `program`, and
 `channel` are applied exactly as authored.
 
@@ -331,7 +341,7 @@ As an alternative to a SoundFont, a track can play a single audio sample:
 
 ```yaml
 - name: sampled-synth
-  sample: 'd:\samples\mysynth c.wav'
+  sample: '.\samples\mysynth c.wav'
   map:
     - x: [0, 1, 2]
   patterns:
@@ -344,6 +354,14 @@ As an alternative to a SoundFont, a track can play a single audio sample:
 The sample is loaded before playback and then pitched when notes are
 triggered by the pattern. The audio callback only renders already loaded
 sample data.
+
+Relative sample paths are resolved relative to the YAML song file, not the
+current terminal directory. For example, if `song.yml` is in `C:\Songs\909`,
+this loads `C:\Songs\909\TR 909 Kick 01.wav`:
+
+```yaml
+sample: '.\TR 909 Kick 01.wav'
+```
 
 `sampleNote` tells EDMAC what note the original sample is playing:
 
@@ -640,9 +658,14 @@ Global transport controls:
 | Key | Action |
 | --- | --- |
 | `Space` | Toggle play/pause |
-| `R` | Restart the current song from the beginning |
+| `H` | Restart the current song from the beginning |
+| `R` | Start / stop recording the mixed output to WAV |
 | `Q` | Quit playback |
 | `Escape` | Quit playback |
+
+Recordings are saved under `recordings` beside the running app executable. Each
+recording uses a date/time-stamped file name so previous takes are not
+overwritten.
 
 Track controls toggle mute state:
 
@@ -811,7 +834,7 @@ Before playback, confirm:
 - Chord names use supported major/minor triad syntax.
 - Chord duration suffixes, when present, are positive integers such as `A:3`.
 - Function controls are between `f1` and `f24`.
-- Relative SoundFont paths are relative to the YAML file.
+- Relative SoundFont and sample paths are relative to the YAML file.
 - `amp` values are non-negative.
 - `edmac validate song.yml` reports the intended first events.
 
