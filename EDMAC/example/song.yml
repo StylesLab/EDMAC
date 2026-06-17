@@ -174,7 +174,7 @@ tracks:
 
   # MOTION: arpeggio with band-pass and phaser.
   - name: arp
-    sample: 'D:\samples\Deeper House\Instruments\RushArp\DH_RushArp-C2.wav'
+    sample: '.\DH_RushArp-C2.wav'
     sampleNote: c2
     map:
       - z: [0]
