@@ -30,7 +30,7 @@ public sealed class HotReloadingPlayer
     {
         ConsoleUi.Banner();
         ConsoleUi.Info("Press Space to start. Space pauses/resumes. H restart. R record. Q or Escape quit.");
-        ConsoleUi.Info("Function keys toggle tracks and progressions.");
+        ConsoleUi.Info("Function keys select track groups and progressions.");
         ConsoleUi.Info("Editing the YAML file will reload it and restart playback.");
 
         using var hostCancellation = new CancellationTokenSource();
@@ -113,6 +113,7 @@ public sealed class HotReloadingPlayer
 
         if (paused)
         {
+            PrintControlSummary(song);
             hasLoadedOnce = true;
             ConsoleUi.Success($"Loaded {Path.GetFileName(yamlPath)}. Press Space to play.");
             return;
@@ -124,6 +125,7 @@ public sealed class HotReloadingPlayer
         {
             StartPlayer(song, printStartupDiagnostics: !hasLoadedOnce);
 
+            PrintControlSummary(song);
             hasLoadedOnce = true;
             ConsoleUi.Success($"Reloaded {Path.GetFileName(yamlPath)}");
         }
@@ -306,5 +308,47 @@ public sealed class HotReloadingPlayer
         }
 
         ConsoleUi.Control(path is null ? "Record off" : $"Record off -> {path}");
+    }
+
+    private static void PrintControlSummary(Song song)
+    {
+        song.InitializeTrackEnabledStates();
+
+        ConsoleUi.KeyValue("StartOn", song.StartOnControl?.ToString() ?? "(none)");
+        ConsoleUi.KeyValue("ActiveTracks", song.ActiveTrackControl?.ToString() ?? "(all)");
+
+        ConsoleKey[] trackControls = song.Tracks
+            .SelectMany(track => track.Controls)
+            .Distinct()
+            .Order()
+            .ToArray();
+
+        ConsoleUi.KeyValue(
+            "TrackControls",
+            trackControls.Length == 0
+                ? "(none - all tracks always enabled)"
+                : string.Join(",", trackControls));
+
+        foreach (ConsoleKey control in trackControls)
+        {
+            string trackNames = string.Join(
+                ",",
+                song.Tracks
+                    .Where(track => track.HasControl(control))
+                    .Select(track => track.Name));
+            ConsoleUi.KeyValue(control.ToString(), trackNames);
+        }
+
+        ConsoleKey[] progressionControls = song.Progressions
+            .Select(progression => progression.Control)
+            .Distinct()
+            .Order()
+            .ToArray();
+
+        ConsoleUi.KeyValue(
+            "ProgressionControls",
+            progressionControls.Length == 0
+                ? "(none)"
+                : string.Join(",", progressionControls));
     }
 }

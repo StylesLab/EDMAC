@@ -8,8 +8,6 @@ public sealed class Track
 
     public required string Name { get; init; }
 
-    public required bool InitiallyEnabled { get; init; }
-
     public required TrackInstrumentKind InstrumentKind { get; init; }
 
     public string? SoundFontPath { get; init; }
@@ -30,7 +28,7 @@ public sealed class Track
 
     public required IReadOnlyList<TrackEffectSettings> Effects { get; init; }
 
-    public required ConsoleKey Control { get; init; }
+    public required IReadOnlySet<ConsoleKey> Controls { get; init; }
 
     public required IReadOnlyDictionary<char, NoteMapping> NoteMappings { get; init; }
 
@@ -38,18 +36,18 @@ public sealed class Track
 
     public Pattern TimingPattern => Patterns[0];
 
+    public bool HasControls => Controls.Count > 0;
+
     public bool Enabled => Volatile.Read(ref enabled) != 0;
 
-    public void InitializeEnabledState()
+    public bool HasControl(ConsoleKey control)
     {
-        Interlocked.Exchange(ref enabled, InitiallyEnabled ? 1 : 0);
+        return Controls.Contains(control);
     }
 
-    public bool Toggle()
+    public void SetEnabled(bool value)
     {
-        int next = Enabled ? 0 : 1;
-        Interlocked.Exchange(ref enabled, next);
-        return next != 0;
+        Interlocked.Exchange(ref enabled, value ? 1 : 0);
     }
 }
 

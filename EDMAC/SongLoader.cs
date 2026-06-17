@@ -41,11 +41,13 @@ public static class SongLoader
 
         ValidateResolvedMappings(tracks, progressions);
         ValidateEffects(tracks, sampleRate, definition.Bpm);
+        ConsoleKey? startOnControl = ResolveStartOnControl(definition.StartOn, tracks);
 
         return new Song
         {
             Bpm = definition.Bpm,
             SampleRate = sampleRate,
+            StartOnControl = startOnControl,
             Progressions = progressions,
             Tracks = tracks
         };
@@ -233,10 +235,11 @@ public static class SongLoader
         ValidateMidiValue(definition.Program, 0, 127, definition.Name, "program");
         ValidateMidiValue(definition.Velocity, 1, 127, definition.Name, "velocity");
         ValidateAmp(definition.Amp, definition.Name);
-        bool initiallyEnabled = ParseInitialEnabled(definition);
 
         Dictionary<char, NoteMapping> mappings = ParseMappings(definition, hasProgressions);
-        ConsoleKey control = ParseControl(definition.Control, $"Track '{definition.Name}'");
+        IReadOnlySet<ConsoleKey> controls = ParseOptionalControls(
+            definition.Control,
+            $"Track '{definition.Name}'");
         string? soundFontPath = hasSoundFont
             ? ResolveAssetPath(definition.Soundfont, songDirectory)
             : null;
@@ -260,7 +263,6 @@ public static class SongLoader
         return new Track
         {
             Name = definition.Name,
-            InitiallyEnabled = initiallyEnabled,
             InstrumentKind = hasSoundFont
                 ? TrackInstrumentKind.SoundFont
                 : TrackInstrumentKind.Sample,
@@ -273,7 +275,7 @@ public static class SongLoader
             Velocity = definition.Velocity,
             Amp = definition.Amp,
             Effects = ParseEffects(definition.Name, definition.Effects),
-            Control = control,
+            Controls = controls,
             NoteMappings = mappings,
             Patterns = patterns
         };
@@ -284,32 +286,6 @@ public static class SongLoader
         return Path.IsPathFullyQualified(path)
             ? Path.GetFullPath(path)
             : Path.GetFullPath(path, songDirectory);
-    }
-
-    private static bool ParseInitialEnabled(TrackDefinition definition)
-    {
-        if (definition.Enabled.HasValue)
-        {
-            return definition.Enabled.Value;
-        }
-
-        if (string.IsNullOrWhiteSpace(definition.Status))
-        {
-            return true;
-        }
-
-        if (definition.Status.Equals("enabled", StringComparison.OrdinalIgnoreCase))
-        {
-            return true;
-        }
-
-        if (definition.Status.Equals("disabled", StringComparison.OrdinalIgnoreCase))
-        {
-            return false;
-        }
-
-        throw new InvalidDataException(
-            $"Track '{definition.Name}' status must be enabled or disabled.");
     }
 
     private static IReadOnlyList<TrackEffectSettings> ParseEffects(
@@ -384,10 +360,13 @@ public static class SongLoader
         {
             foreach ((string symbolText, object rawValue) in mapEntry)
             {
-                if (symbolText.Length != 1 || symbolText[0] is '.' or '|')
+                if (symbolText.Length != 1 ||
+                    symbolText[0] == Pattern.RestSymbol ||
+                    symbolText[0] == Pattern.TieSymbol ||
+                    symbolText[0] == '|')
                 {
                     throw new InvalidDataException(
-                        $"Track '{definition.Name}' mapping keys must be one character and cannot be '.' or '|'.");
+                        $"Track '{definition.Name}' mapping keys must be one character and cannot be '.', '>', or '|'.");
                 }
 
                 NoteMapping mapping = ParseMappingValue(
@@ -484,6 +463,56 @@ public static class SongLoader
         return key;
     }
 
+    private static IReadOnlySet<ConsoleKey> ParseOptionalControls(string controls, string owner)
+    {
+        var parsed = new HashSet<ConsoleKey>();
+
+        if (string.IsNullOrWhiteSpace(controls))
+        {
+            return parsed;
+        }
+
+        foreach (string control in controls.Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries))
+        {
+            parsed.Add(ParseControl(control, owner));
+        }
+
+        return parsed;
+    }
+
+    private static ConsoleKey? ResolveStartOnControl(string startOn, IReadOnlyList<Track> tracks)
+    {
+        ConsoleKey[] availableControls = tracks
+            .SelectMany(track => track.Controls)
+            .Distinct()
+            .Order()
+            .ToArray();
+
+        if (availableControls.Length == 0)
+        {
+            if (!string.IsNullOrWhiteSpace(startOn))
+            {
+                throw new InvalidDataException("startOn was specified, but no track controls are defined.");
+            }
+
+            return null;
+        }
+
+        if (string.IsNullOrWhiteSpace(startOn))
+        {
+            return availableControls[0];
+        }
+
+        ConsoleKey startOnControl = ParseControl(startOn, "Song startOn");
+        if (!availableControls.Contains(startOnControl))
+        {
+            throw new InvalidDataException(
+                $"Song startOn '{startOn}' does not match any track control.");
+        }
+
+        return startOnControl;
+    }
+
     private static void ValidateSongDefinition(SongDefinition definition)
     {
         if (definition.Bpm <= 0 || double.IsNaN(definition.Bpm) || double.IsInfinity(definition.Bpm))
@@ -524,6 +553,9 @@ public static class SongLoader
     {
         public double Bpm { get; set; }
 
+        [YamlMember(Alias = "startOn", ApplyNamingConventions = false)]
+        public string StartOn { get; set; } = string.Empty;
+
         public List<ProgressionDefinition> Progressions { get; set; } = [];
 
         public List<TrackDefinition> Tracks { get; set; } = [];
@@ -541,10 +573,6 @@ public static class SongLoader
     private sealed class TrackDefinition
     {
         public string Name { get; set; } = string.Empty;
-
-        public bool? Enabled { get; set; }
-
-        public string Status { get; set; } = string.Empty;
 
         public string Soundfont { get; set; } = string.Empty;
 

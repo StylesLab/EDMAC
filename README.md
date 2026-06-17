@@ -2,7 +2,7 @@
 
 ![EDMAC logo](EDMaC.png)
 
-EDMAC is a real-time, YAML-driven tracker-style music engine for .NET 8. It
+EDMAC is a real-time, YAML-driven tracker-style music engine for .NET 10. It
 uses SoundFonts for instruments, loops patterns indefinitely, supports
 multiple simultaneous pattern lanes, and lets you mute tracks or select chord
 progressions with function keys.
@@ -16,8 +16,18 @@ EDMAC uses:
 ## Requirements
 
 - Windows
-- .NET 8 SDK or runtime
-- One or more `.sf2` SoundFont files
+- .NET 10 SDK or runtime
+- One or more `.sf2` SoundFont or sammple files
+
+## Finding Sounds
+
+Good places to find material for EDMAC songs:
+
+- [MusicRadar SampleRadar](https://www.musicradar.com/news/tech/free-music-samples-royalty-free-loops-hits-and-multis-to-download-sampleradar) has a large collection of royalty-free WAV loops, hits, and multisamples.
+- [Polyphone SoundFonts](https://www.polyphone.io/en/soundfonts) is a useful library of downloadable `.sf2` SoundFonts.
+
+Always check the license for any sample pack or SoundFont before releasing
+music made with it.
 
 Build the application from the repository root:
 
@@ -67,6 +77,7 @@ song keeps playing and the reload error is printed.
 
 ```yaml
 bpm: 120
+startOn: f1
 
 progressions:
   - name: verse
@@ -132,8 +143,9 @@ This example:
 - Plays the snare on sixteenth-note steps.
 - Plays the root, third, and fifth of the current chord for a full bar.
 - Starts with the `verse` progression.
+- Starts with the `F1` track group active.
 - Selects `verse` with `F9` and `chorus` with `F10`.
-- Toggles kick, snare, and chords with `F1`, `F2`, and `F3`.
+- Selects the kick, snare, and chords track groups with `F1`, `F2`, and `F3`.
 
 ## Top-Level Fields
 
@@ -146,6 +158,20 @@ bpm: 120
 ```
 
 The value must be finite and greater than zero.
+
+### `startOn`
+
+Optional. Selects the track control group that is active when playback starts:
+
+```yaml
+bpm: 120
+startOn: f1
+```
+
+`startOn` must be a function key used by at least one track `control`. If it is
+omitted, EDMAC starts on the lowest function key used by any track. If no
+tracks specify `control`, every track starts enabled and function keys do not
+select track groups.
 
 ### `progressions`
 
@@ -273,13 +299,11 @@ MIDI note lengths. Track note lengths are still controlled by each track's
 | `channel` | No | `0` | MIDI channel, from 0 through 15 |
 | `velocity` | No | `127` | Note velocity, from 1 through 127 |
 | `amp` | No | `1.0` | Linear output gain for this track |
-| `enabled` | No | `true` | Whether the track starts enabled |
-| `status` | No | `enabled` | Alternative startup state: `enabled` or `disabled` |
 | `effects` | No | none | Per-track effect chain |
 | `map` | Yes | - | Pattern-symbol mappings |
 | `patterns` | Yes | - | One or more simultaneous pattern lanes |
 | `beats` | Yes | - | Number of steps per four-beat bar |
-| `control` | Yes | - | Function key that toggles the track |
+| `control` | No | always enabled | One or more comma-separated function-key groups |
 
 The older singular `pattern:` field is also accepted for songs containing one
 pattern:
@@ -294,20 +318,21 @@ precedence over `pattern:`.
 Each track must specify exactly one audio source: either `soundfont` or
 `sample`.
 
-Startup state can be controlled with either `enabled`:
+Track controls are group memberships. A track can belong to one group:
 
 ```yaml
-enabled: false
+control: f1
 ```
 
-or `status`:
+or several groups:
 
 ```yaml
-status: disabled
+control: f1,f2
 ```
 
-If neither is present, the track starts enabled. If both are present,
-`enabled` takes precedence.
+When a function key is selected, tracks containing that key are enabled.
+Controlled tracks that do not contain that key are muted. Tracks with no
+`control` field are always enabled.
 
 ### SoundFont Paths
 
@@ -691,19 +716,29 @@ Recordings are saved under `recordings` beside the running app executable. Each
 recording uses a date/time-stamped file name so previous takes are not
 overwritten.
 
-Track controls toggle mute state:
+Track controls select active track groups:
 
 ```yaml
-control: f1
+startOn: f1
+
+tracks:
+  - name: drums
+    control: f1
+
+  - name: bass
+    control: f1,f2
+
+  - name: lead
+    control: f2
 ```
 
-- Press once to mute the track.
-- Press again to enable it.
-- Muting immediately stops its current notes.
+- Press `F1` to enable `drums` and `bass`.
+- Press `F2` to enable `bass` and `lead`.
+- Tracks can belong to multiple groups by separating controls with commas.
+- Tracks with no `control` field are always enabled.
+- Tracks muted by a group change immediately stop their current notes.
 - The pattern timing continues while muted.
-- Re-enabling rejoins the pattern at its current position.
-- Tracks that start with `enabled: false` or `status: disabled` are enabled
-  by pressing their function key.
+- Re-enabled tracks rejoin the pattern at its current position.
 
 Progression controls select or cycle progressions:
 
@@ -849,8 +884,9 @@ tracks at `amp: 1.0` can clip when combined.
 
 ### Function keys do not behave as expected
 
-Check for duplicated controls. Shared progression controls cycle matching
-progressions, while a key shared by a track and progression performs both
+Shared track controls are normal: every track containing the selected key is
+enabled as part of that group. Shared progression controls cycle matching
+progressions. A key shared by a track group and a progression performs both
 operations.
 
 ## Authoring Checklist
@@ -858,8 +894,9 @@ operations.
 Before playback, confirm:
 
 - `bpm` is greater than zero.
-- Every track has a name, SoundFont, map, pattern, beats value, and control.
-- Tracks that should start muted use `enabled: false` or `status: disabled`.
+- Every track has a name, SoundFont or sample, map, pattern, and beats value.
+- Track controls are comma-separated function keys when present.
+- `startOn`, when present, matches at least one track control.
 - Every pattern symbol except `.`, `>`, and `|` is mapped.
 - Absolute notes are in MIDI range 0 through 127.
 - Relative mappings have at least one progression.

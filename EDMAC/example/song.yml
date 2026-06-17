@@ -1,160 +1,258 @@
-bpm: 120
+# EDMAC showcase song
+#
+# This is both a playable demo and a compact authoring reference.
+# All paths are relative to this YAML file, so the song can be launched from
+# any working directory:
+#
+#   edmac .\EDMAC\example\song.yml
 
+bpm: 125
+
+# Track controls are scene/group selectors.
+# F1 starts the minimal groove, then F2/F3/F4/F5 add more parts.
+startOn: f1
+
+# Progressions are selected independently from track groups.
+# Chord suffixes are durations in quarters of a bar: Bb:2 lasts half a bar.
 progressions:
-  - name: "verse"  
+  - name: main
     chords:
-      - Bm
-      - G
-      - D
-      - A:3
-      - G:1
-    control: f9   
-  - name: "chorus"  
+      - Dm
+      - F
+      - Bb:2
+      - C:2
+      - Dm
+    control: f5
+
+  - name: lift
     chords:
+      - F
       - G
-      - A
+      - F
       - G
-      - A
     control: f10
-  
+
 tracks:
-  
+  # DRUMS: SoundFont example.
+  #
+  # The bundled TR-909 font exposes drum presets at bank 128, programs 0/1.
+  # Notes used here include: kick=36, snare=38/40, clap=39,
+  # closed hats=42/44, open hat=46, ride=51.
+  #
+  # EDMAC applies bank/program/channel exactly; it does not assume GM drums.
   - name: kick
-    sample: '.\TR 909 Kick 01.wav'
-    sampleNote: c4
+    soundfont: '.\TR-909_Drums.SF2'
+    bank: 128
+    program: 0
+    channel: 9
     map:
-      - x: 60
+      - x: 36
     patterns:
       - x|x|x|x
     beats: 4
-    amp: 0.8
-    control: f1
-    status: enabled
+    amp: 1.0
+    control: f1,f2,f3,f4,f5,f10
 
-  - name: snare
-    sample: '.\Techno Snare 01.wav'
-    sampleNote: c4
+  - name: snare-clap
+    soundfont: '.\TR-909_Drums.SF2'
+    bank: 128
+    program: 0
+    channel: 9
     map:
-      - x: 60
+      - s: 38
+      - S: 40
+      - c: 39
     patterns:
-      - ....x.......x...|....x.......x.xx
+      # Two lanes: the main snare and a clap/fill layer.
+      - ....s.......s...|....s..s....s.Ss
+      - ..............c.|............c...
     beats: 16
-    amp: 0.8
-    control: f2
-    status: disabled
+    amp: 1.
+    effects:
+      - type: reverb
+        mix: 0.16
+        room: 0.55
+        damp: 0.4
+    control: f1,f2,f3,f4,f5,F10
 
-  
-  - name: hat
-    sample: '.\Techno Closed Hat 01.wav'
-    sampleNote: c4
+  - name: hats
+    soundfont: '.\TR-909_Drums.SF2'
+    bank: 128
+    program: 0
+    channel: 9
     map:
-      - x: 60
+      - x: 42
+      - o: 46
+      - c: 49
     patterns:
-      - xx.xxx.xxx.xxx.x
-    beats: 16
-    amp: 0.38
-    control: f4
-    status: disabled
+      - .o.o.o.o
+      - .....xxx 
+      - c>>.....|........c>>.....|c>..c>c>
+    beats: 8
+    amp: 0.32
+    effects:
+      # High-pass keeps cymbals away from the kick and bass.
+      - type: highpass
+        cutoff: 1700
+        q: 0.7
+    control: f1,f2,f3,f4,f5,f10
 
-  - name: chords
-    sample: '.\80s_JupiPoly_C2.wav'
-    sampleNote: c2
-    map:
-     - x: [3,4,5]     
-    patterns:
-      - x     
-    beats: 4
-    amp: 0.2
-    control: f3
-    status: disabled
-  
+  # BASS: sample playback, chord-relative mapping, Tie Steps, filter sweep.
   - name: bass
     sample: '.\80s_MatrixBassA-C2.wav'
     sampleNote: c2
     map:
-     - x: [-3]
-     - y: [0]
+      # [0] is the current chord root. [-3] is a lower chord tone.
+      - r: [0]
+      - l: [-3]
     patterns:
-      - xyxyxyxy
-    beats: 8
-    amp: 0.4
+      # > is a Tie Step: it holds the previous note through this step.
+      - l>.r.r..l>...r..
+    beats: 16
+    amp: 0.6
     effects:
       - type: lowpass
-        from: 500
-        to: 9000
+        from: 450
+        to: 7600
         durationBeats: 16
-        q: 0.8 
+        q: 0.85
 
       - type: chorus
-        mix: 0.3
+        mix: 0.22
         rateHz: 0.35
         delayMs: 18
         depthMs: 8
-    control: f4
-    status: disabled
 
-  - name: lead
-    sample: '.\Super Saw C4.wav'
-    sampleNote: c6
+      - type: reverb
+        mix: 0.5
+        room: 0.85
+        damp: 0.35
+    control: f3,f4,f5,f10
+
+  # PADS: multiple simultaneous pattern lanes and chord voicings.
+  - name: chords
+    sample: '.\Buzz Pad C4.wav'
+    sampleNote: c4
     map:
-     - b: [5]
-     - a: [7]
-     - z: [8]
-     - x: [9]
-     - c: [11]
+      - z: [6,4,5]      
+      - x: [6,7,8]
     patterns:
-      - ..xx..zzxx..zzxxcczz..zx.z......|..xx..zzxx..zzxxcczz..za.b......
-    beats: 8
-    amp: 0.5
+      # Lane 1 holds lower chords. Lane 2 adds a higher chord stab.
+      - z>>>z>>>|z>>>z>>>
+      - ....x...|....x...
+    beats: 4
+    amp: 0.08
     effects:
       - type: reverb
-        mix: 0.80
-        room: 0.8
+        mix: 0.32
+        room: 0.82
         damp: 0.35
-        depthMs: 8
+
+      - type: stereoWidth
+        width: 1.35
+    control: f4,f5
+
+  - name: sweep-pad
+    sample: '.\DH_Fadapad-C3.wav'
+    sampleNote: c3
+    map:
+      - x: [-3]
+    patterns:
+      - x>>>x>>>|x>>>x>x>|x>>>x>>>|x>>>x>x>
+    beats: 8
+    amp: 0.22
+    effects:
+      - type: lowpass
+        from: 250
+        to: 6500
+        durationBeats: 32
+        q: 0.65
+
+      - type: stereoWidth
+        width: 1.55
+    control: f4,f5,f10
+
+  # MOTION: arpeggio with band-pass and phaser.
+  - name: arp
+    sample: 'D:\samples\Deeper House\Instruments\RushArp\DH_RushArp-C2.wav'
+    sampleNote: c2
+    map:
+      - z: [0]
+      - x: [1]
+      - c: [2]
+      - v: [3]
+      - b: [4]
+      - n: [5]
+      - m: [6]
+    patterns:
+      - zxcvbnmnbvcxzxcx
+    beats: 16
+    amp: 0.21
+    effects:
+      - type: bandpass
+        from: 600
+        to: 3200
+        durationBeats: 16
+        q: 1.2
+
+      - type: phaser
+        mix: 0.28
+        rateHz: 0.22
+        depth: 0.75
+        feedback: 0.12
+    control: f4,f5,f10
+
+  # LEAD: absolute MIDI notes, delay, reverb, and flanger.
+  - name: lead
+    sample: '.\Super Saw C4.wav'
+    sampleNote: c4
+    map:
+      - d: 62
+      - f: 65
+      - g: 67
+      - a: 69
+      - b: 70
+      - c: 72
+      - D: 74
+      - e: 76
+      - F: 77
+    patterns:
+      - .aF.e.D.a..a....|.aF.e.D.a..a....|.fc.b.a.f..f....|.da.g.f.d..d....
+    beats: 16
+    amp: 0.38
+    effects:
+      - type: reverb
+        mix: 0.55
+        room: 0.85
+        damp: 0.35
+
       - type: delay
         time: dotted-eighth
         feedback: 0.35
-        mix: 0.25
+        mix: 0.24
+
+      - type: flanger
+        mix: 0.12
+        rateHz: 0.18
+        delayMs: 3
+        depthMs: 2
+        feedback: 0.25
     control: f5
-    status: disabled
 
-  - name: arp
-    sample: '.\Arp E C4.wav'
-    sampleNote: c3
-    map:
-       - a: [0]   
-       - b: [1]       
-       - z: [3]
-       - x: [4]
-       - c: [5]
-    beats: 16
-    amp: 0.1
-    patterns:
-      - abzxcxzbabzxcxzbabzxcxzbabzxcxzbabzxcxzb
-    control: f6
-    effects:
-      - type: lowpass
-        from: 500
-        to: 9000
-        durationBeats: 16
-        q: 0.8 
-
-      - type: chorus
-        mix: 0.3
-        rateHz: 0.35
-        delayMs: 18
-        depthMs: 8
-    status: disabled
-
-  - name: fx
+  # FX: a one-bar trigger, plus tempo-synced echo.
+  - name: drop-fx
     sample: '.\D&B Drop FX 01.wav'
     sampleNote: c
-    map:     
-     - x: [0]     
+    map:
+      - x: [0]
     patterns:
+      # beats: 1 means each pattern step is one full bar.
       - x...
     beats: 1
-    amp: 0.1   
-    control: f7
-    status: disabled
+    amp: 0.08
+    effects:
+      - type: delay
+        time: quarter
+        feedback: 0.25
+        mix: 0.18
+    control: f5,f10

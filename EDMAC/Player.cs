@@ -17,10 +17,7 @@ public sealed class Player : IDisposable
     {
         this.song = song;
         this.printStartupDiagnostics = printStartupDiagnostics;
-        foreach (Track track in song.Tracks)
-        {
-            track.InitializeEnabledState();
-        }
+        song.InitializeTrackEnabledStates();
 
         instruments = song.Tracks
             .Select(track => InstrumentFactory.Create(track, song.SampleRate))
@@ -91,18 +88,34 @@ public sealed class Player : IDisposable
         for (var trackIndex = 0; trackIndex < song.Tracks.Count; trackIndex++)
         {
             Track track = song.Tracks[trackIndex];
-            if (track.Control != key)
+            if (!track.HasControl(key))
             {
                 continue;
             }
 
-            bool enabled = track.Toggle();
-            if (!enabled)
+            ApplyTrackControl(key);
+            break;
+        }
+    }
+
+    private void ApplyTrackControl(ConsoleKey key)
+    {
+        bool[] wasEnabled = song.Tracks
+            .Select(track => track.Enabled)
+            .ToArray();
+
+        song.ApplyTrackControl(key);
+        ConsoleUi.Control($"Tracks={key}");
+
+        for (var trackIndex = 0; trackIndex < song.Tracks.Count; trackIndex++)
+        {
+            Track track = song.Tracks[trackIndex];
+            if (wasEnabled[trackIndex] && !track.Enabled)
             {
                 instruments[trackIndex].StopChannel(track.Channel);
             }
 
-            ConsoleUi.Track(track.Name, enabled ? "enabled" : "muted");
+            ConsoleUi.Track(track.Name, track.Enabled ? "enabled" : "muted");
         }
     }
 
@@ -178,6 +191,8 @@ public sealed class Player : IDisposable
 
     private void PrintStartupDiagnostics()
     {
+        PrintControlDiagnostics();
+
         foreach (Track track in song.Tracks)
         {
             ConsoleUi.KeyValue("Track", track.Name);
@@ -189,6 +204,7 @@ public sealed class Player : IDisposable
             ConsoleUi.KeyValue("SamplesPerStep", track.TimingPattern.SamplesPerStep.ToString());
             ConsoleUi.KeyValue("Amp", track.Amp.ToString());
             ConsoleUi.KeyValue("Effects", track.Effects.Count.ToString());
+            ConsoleUi.KeyValue("Controls", FormatControls(track.Controls));
             ConsoleUi.KeyValue("Enabled", track.Enabled.ToString());
         }
 
@@ -196,5 +212,52 @@ public sealed class Player : IDisposable
         {
             ConsoleUi.KeyValue("Progression", song.ActiveProgression.Name);
         }
+    }
+
+    private void PrintControlDiagnostics()
+    {
+        ConsoleUi.KeyValue("StartOn", song.StartOnControl?.ToString() ?? "(none)");
+        ConsoleUi.KeyValue("ActiveTracks", song.ActiveTrackControl?.ToString() ?? "(all)");
+
+        ConsoleKey[] trackControls = song.Tracks
+            .SelectMany(track => track.Controls)
+            .Distinct()
+            .Order()
+            .ToArray();
+
+        ConsoleUi.KeyValue(
+            "TrackControls",
+            trackControls.Length == 0
+                ? "(none - all tracks always enabled)"
+                : string.Join(",", trackControls));
+
+        foreach (ConsoleKey control in trackControls)
+        {
+            string trackNames = string.Join(
+                ",",
+                song.Tracks
+                    .Where(track => track.HasControl(control))
+                    .Select(track => track.Name));
+            ConsoleUi.KeyValue($"{control}", trackNames);
+        }
+
+        ConsoleKey[] progressionControls = song.Progressions
+            .Select(progression => progression.Control)
+            .Distinct()
+            .Order()
+            .ToArray();
+
+        ConsoleUi.KeyValue(
+            "ProgressionControls",
+            progressionControls.Length == 0
+                ? "(none)"
+                : string.Join(",", progressionControls));
+    }
+
+    private static string FormatControls(IReadOnlySet<ConsoleKey> controls)
+    {
+        return controls.Count == 0
+            ? "(always)"
+            : string.Join(",", controls.Order());
     }
 }

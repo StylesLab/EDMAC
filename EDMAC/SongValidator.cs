@@ -4,7 +4,10 @@ public static class SongValidator
 {
     public static void Print(Song song)
     {
+        song.InitializeTrackEnabledStates();
+
         Console.WriteLine($"BPM={song.Bpm}");
+        Console.WriteLine($"StartOn={song.StartOnControl?.ToString() ?? "(none)"}");
         Console.WriteLine($"Progressions={song.Progressions.Count}");
 
         foreach (ChordProgression progression in song.Progressions)
@@ -33,9 +36,9 @@ public static class SongValidator
 
             Console.WriteLine($"SamplesPerStep={track.TimingPattern.SamplesPerStep}");
             Console.WriteLine($"Amp={track.Amp}");
-            Console.WriteLine($"InitiallyEnabled={track.InitiallyEnabled}");
+            Console.WriteLine($"Enabled={track.Enabled}");
             Console.WriteLine($"Effects={string.Join(",", track.Effects.Select(effect => effect.Type))}");
-            Console.WriteLine($"Control={track.Control}");
+            Console.WriteLine($"Controls={FormatControls(track.Controls)}");
             Console.WriteLine("NoteMappings:");
 
             foreach ((char symbol, NoteMapping mapping) in
@@ -114,5 +117,12 @@ public static class SongValidator
             throw new InvalidDataException(
                 $"Track '{trackName}' mapping '{symbol}' resolves outside the MIDI note range.");
         }
+    }
+
+    private static string FormatControls(IReadOnlySet<ConsoleKey> controls)
+    {
+        return controls.Count == 0
+            ? "(always)"
+            : string.Join(",", controls.Order());
     }
 }
