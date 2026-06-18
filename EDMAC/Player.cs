@@ -31,7 +31,7 @@ public sealed class Player : IDisposable
             .ToArray();
         previousTrackEnabledStates = new bool[song.Tracks.Count];
 
-        audioEngine = new AudioEngine(instruments, effects, song.SampleRate);
+        audioEngine = new AudioEngine(song.Tracks, instruments, effects, song.SampleRate);
         noteQueue = Channel.CreateBounded<ScheduledTrackNote>(
             new BoundedChannelOptions(1024)
             {
@@ -165,7 +165,7 @@ public sealed class Player : IDisposable
         CancellationToken cancellationToken)
     {
         Thread.CurrentThread.Name ??= "EDMAC MIDI Dispatcher";
-        Thread.CurrentThread.Priority = ThreadPriority.Highest;
+        Thread.CurrentThread.Priority = ThreadPriority.AboveNormal;
 
         try
         {

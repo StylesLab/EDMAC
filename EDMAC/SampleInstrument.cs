@@ -4,7 +4,7 @@ namespace EDMAC;
 
 public sealed class SampleInstrument : IInstrument
 {
-    private const int MaxVoices = 64;
+    private const int MaxVoices = 24;
     private readonly object voiceLock = new();
     private readonly float[] left;
     private readonly float[] right;

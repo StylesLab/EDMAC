@@ -23,7 +23,7 @@ public sealed class Sequencer
     public void Run(CancellationToken cancellationToken)
     {
         Thread.CurrentThread.Name ??= "EDMAC Sequencer";
-        Thread.CurrentThread.Priority = ThreadPriority.Highest;
+        Thread.CurrentThread.Priority = ThreadPriority.AboveNormal;
 
         try
         {

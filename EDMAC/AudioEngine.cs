@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Runtime.InteropServices;
 using EDMAC.Effects;
 using NAudio.Wave;
@@ -11,20 +12,24 @@ public sealed class AudioEngine : IWaveProvider, IDisposable
     // Larger chunks reduce callback overhead under heavy instrument/effect load.
     private const int RenderBlockFrames = 256;
 
+    private readonly IReadOnlyList<Track> tracks;
     private readonly IInstrument[] instruments;
     private readonly IAudioEffect[][] effects;
     private readonly float[] renderLeft = new float[RenderBlockFrames];
     private readonly float[] renderRight = new float[RenderBlockFrames];
     private readonly WaveOutEvent output;
     private readonly AudioRecorder recorder;
+    private int effectBypassReads;
     private long samplePosition;
     private bool disposed;
 
     public AudioEngine(
+        IReadOnlyList<Track> tracks,
         IInstrument[] instruments,
         IAudioEffect[][] effects,
         int sampleRate)
     {
+        this.tracks = tracks;
         this.instruments = instruments;
         this.effects = effects;
         WaveFormat = WaveFormat.CreateIeeeFloatWaveFormat(sampleRate, Channels);
@@ -70,12 +75,14 @@ public sealed class AudioEngine : IWaveProvider, IDisposable
 
     public int Read(byte[] buffer, int offset, int count)
     {
+        long renderStartTimestamp = Stopwatch.GetTimestamp();
         Span<byte> bytes = buffer.AsSpan(offset, count);
         Span<float> outputSamples = MemoryMarshal.Cast<byte, float>(bytes);
         outputSamples.Clear();
 
         int totalFrames = outputSamples.Length / Channels;
         int frameOffset = 0;
+        bool bypassEffects = Volatile.Read(ref effectBypassReads) > 0;
 
         while (frameOffset < totalFrames)
         {
@@ -86,14 +93,22 @@ public sealed class AudioEngine : IWaveProvider, IDisposable
 
             for (var instrumentIndex = 0; instrumentIndex < instruments.Length; instrumentIndex++)
             {
+                if (!tracks[instrumentIndex].Enabled)
+                {
+                    continue;
+                }
+
                 IInstrument instrument = instruments[instrumentIndex];
                 left.Clear();
                 right.Clear();
                 instrument.Render(left, right);
 
-                foreach (IAudioEffect effect in effects[instrumentIndex])
+                if (!bypassEffects)
                 {
-                    effect.Process(left, right);
+                    foreach (IAudioEffect effect in effects[instrumentIndex])
+                    {
+                        effect.Process(left, right);
+                    }
                 }
 
                 for (var frame = 0; frame < frames; frame++)
@@ -109,7 +124,26 @@ public sealed class AudioEngine : IWaveProvider, IDisposable
         }
 
         recorder.Capture(buffer, offset, count);
+        UpdatePerformanceGuard(renderStartTimestamp, totalFrames);
         return count;
+    }
+
+    private void UpdatePerformanceGuard(long renderStartTimestamp, int totalFrames)
+    {
+        long elapsedTicks = Stopwatch.GetTimestamp() - renderStartTimestamp;
+        long bufferTicks = totalFrames * Stopwatch.Frequency / WaveFormat.SampleRate;
+        long budgetTicks = bufferTicks * 7 / 10;
+
+        if (elapsedTicks > budgetTicks)
+        {
+            Volatile.Write(ref effectBypassReads, 20);
+            return;
+        }
+
+        if (Volatile.Read(ref effectBypassReads) > 0)
+        {
+            Interlocked.Decrement(ref effectBypassReads);
+        }
     }
 
     public void Dispose()
