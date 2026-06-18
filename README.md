@@ -32,16 +32,6 @@ and run:
 .\edmac.exe example\song.yml
 ```
 
-To publish a release build from the repository root:
-
-```powershell
-dotnet publish EDMAC\EDMAC.csproj -c Release -r win-x64 --self-contained true -o .\publish\edmac-win-x64
-Compress-Archive -Path .\publish\edmac-win-x64\* -DestinationPath .\publish\edmac-win-x64.zip -Force
-```
-
-Upload `publish\edmac-win-x64.zip` to a GitHub Release. The link above will
-automatically point to the newest published release.
-
 ## Finding Sounds
 
 Good places to find material for EDMAC songs:
