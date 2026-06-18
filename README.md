@@ -921,9 +921,26 @@ EDMAC keeps timing and audio rendering separate:
 
 1. YAML is parsed before playback.
 2. Patterns and chord mappings are compiled into runtime models.
-3. A dedicated high-priority sequencer follows an absolute sample clock.
+3. A dedicated sequencer follows an absolute sample clock.
 4. MIDI events are sent to MeltySynth through a producer/consumer queue.
 5. The NAudio callback only renders and mixes preallocated audio buffers.
 
 The audio callback does not parse YAML, calculate pattern timing, allocate
 temporary arrays, or schedule notes.
+
+## Performance Notes
+
+EDMAC tries to protect playback on slower machines:
+
+- Tracks muted by the active control group are skipped by the mixer, including
+  their effects.
+- Sample tracks cap simultaneous voices to avoid runaway overlap.
+- Sequencer and MIDI worker threads avoid `Highest` priority so they do not
+  compete too aggressively with the audio device.
+- If rendering gets too close to the audio buffer deadline, EDMAC briefly
+  bypasses effects to keep audio moving.
+
+For heavier songs, prefer adding parts through track groups instead of running
+every track all the time. Reverb, phaser, flanger, filter sweeps, and long
+sample tails are usually the first places to simplify if a slow machine starts
+to stutter.
