@@ -71,6 +71,7 @@ public sealed class Sequencer
                         char symbol = pattern.GetSymbol(absoluteStep);
                         if (symbol == Pattern.RestSymbol ||
                             symbol == Pattern.TieSymbol ||
+                            !pattern.ShouldTrigger(absoluteStep) ||
                             !track.NoteMappings.TryGetValue(symbol, out NoteMapping? mapping))
                         {
                             continue;
@@ -91,7 +92,9 @@ public sealed class Sequencer
                                     track.Channel,
                                     note,
                                     track.Velocity),
-                                ScheduledNoteKind.NoteOn));
+                                pattern.PlaysToCompletion(absoluteStep)
+                                    ? ScheduledNoteKind.NoteOnPlayToCompletion
+                                    : ScheduledNoteKind.NoteOn));
                         }
                     }
                 }

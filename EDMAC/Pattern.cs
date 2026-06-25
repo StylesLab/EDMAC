@@ -4,10 +4,38 @@ public sealed class Pattern
 {
     public const char RestSymbol = '.';
     public const char TieSymbol = '>';
+    public const char PlayToCompletionSymbol = '+';
+
+    private readonly bool[] playToCompletionSteps;
 
     public Pattern(string source, int beats, int sampleRate, double bpm)
     {
-        Steps = new string(source.Where(character => character != '|').ToArray());
+        var steps = new List<char>();
+        var playToCompletion = new List<bool>();
+
+        foreach (char character in source.Where(character => character != '|'))
+        {
+            if (character == PlayToCompletionSymbol)
+            {
+                if (steps.Count == 0 ||
+                    steps[^1] == RestSymbol ||
+                    steps[^1] == TieSymbol ||
+                    playToCompletion[^1])
+                {
+                    throw new InvalidDataException(
+                        "'+' must immediately follow a pattern mapping symbol.");
+                }
+
+                playToCompletion[^1] = true;
+                continue;
+            }
+
+            steps.Add(character);
+            playToCompletion.Add(false);
+        }
+
+        Steps = new string(steps.ToArray());
+        playToCompletionSteps = playToCompletion.ToArray();
         if (Steps.Length == 0)
         {
             throw new InvalidDataException("A pattern must contain at least one step.");
@@ -46,6 +74,25 @@ public sealed class Pattern
     {
         return GetSymbol(absoluteStep) == TieSymbol;
     }
+
+    public bool ShouldTrigger(long absoluteStep)
+    {
+        int step = (int)(absoluteStep % Length);
+        return !playToCompletionSteps[step] || absoluteStep < Length;
+    }
+
+    public bool PlaysToCompletion(long absoluteStep)
+    {
+        return playToCompletionSteps[(int)(absoluteStep % Length)];
+    }
+
+    public bool HasRepeatingTriggers => Steps
+        .Select((symbol, index) => (symbol, index))
+        .Any(step => step.symbol != RestSymbol &&
+                     step.symbol != TieSymbol &&
+                     !playToCompletionSteps[step.index]);
+
+    public bool HasPlayToCompletionSteps => playToCompletionSteps.Any(value => value);
 
     public long GetSamplePosition(long absoluteStep)
     {

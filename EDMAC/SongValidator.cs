@@ -73,8 +73,12 @@ public static class SongValidator
         int count)
     {
         int emitted = 0;
+        bool hasRepeatingTriggers = track.Patterns.Any(pattern => pattern.HasRepeatingTriggers);
+        int finiteStepCount = track.Patterns.Max(pattern => pattern.Length);
 
-        for (long absoluteStep = 0; emitted < count; absoluteStep++)
+        for (long absoluteStep = 0;
+             emitted < count && (hasRepeatingTriggers || absoluteStep < finiteStepCount);
+             absoluteStep++)
         {
             long samplePosition = track.TimingPattern.GetSamplePosition(absoluteStep);
             Chord? chord = song.GetChord(samplePosition);
@@ -84,6 +88,7 @@ public static class SongValidator
                 char symbol = pattern.GetSymbol(absoluteStep);
                 if (symbol == Pattern.RestSymbol ||
                     symbol == Pattern.TieSymbol ||
+                    !pattern.ShouldTrigger(absoluteStep) ||
                     !track.NoteMappings.TryGetValue(symbol, out NoteMapping? mapping))
                 {
                     continue;

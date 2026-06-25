@@ -96,6 +96,19 @@ tracks:
         cutoff: 1700
         q: 0.7
     control: f2,f3,f4,f5,f10
+  
+  # FX sample playes once to it's end and never repeated.
+  - name: intro-fx
+    sample: '.\audiopapkin-riser-hit-sfx-001-289802.wav'
+    sampleNote: c
+    map:
+      - x: 60  
+    patterns:
+      - x+
+    beats: 1
+    amp: 0.12
+    control: f1
+
 
   # BASS: sample playback, chord-relative mapping, Tie Steps, filter sweep.
   - name: bass

@@ -35,7 +35,7 @@ public sealed class SoundFontInstrument : IInstrument
 
     public float Amp { get; }
 
-    public void NoteOn(int channel, int note, int velocity)
+    public void NoteOn(int channel, int note, int velocity, bool playToCompletion = false)
     {
         lock (synthLock)
         {
@@ -59,7 +59,7 @@ public sealed class SoundFontInstrument : IInstrument
         }
     }
 
-    public void StopChannel(int channel)
+    public void StopChannel(int channel, bool includePlayToCompletion = false)
     {
         lock (synthLock)
         {

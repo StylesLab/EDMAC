@@ -446,7 +446,8 @@ used as the pitch reference.
 
 Samples are one-shot voices. They stop naturally at the end of the file, and
 EDMAC also stops currently sounding sample voices at each track step boundary
-and when the track is muted.
+and when the track is muted. A sample marked with `+` is allowed to play through
+step boundaries, but muting its track still stops it.
 
 ### `amp`
 
@@ -559,10 +560,11 @@ Pattern rules:
 - `|` is visual formatting and is removed before playback.
 - `.` is a rest.
 - `>` is a Tie Step that extends the previous note through this step.
+- `+` after a mapped symbol plays that sample once, through to its natural end.
 - Any other character must exist in the track's `map`.
 - Patterns loop indefinitely.
 - Mapping symbols must be exactly one character.
-- `.`, `>`, and `|` cannot be mapping symbols.
+- `.`, `>`, `+`, and `|` cannot be mapping symbols.
 
 For example:
 
@@ -632,6 +634,25 @@ Tie Steps occupy real pattern time. They are not removed like `|`, and they do
 not trigger notes themselves. On a Tie Step, EDMAC skips the normal track
 release, allowing currently sounding notes on that track to continue until the
 next non-tie step or until the track is muted.
+
+### Play-To-Completion Steps
+
+Add `+` immediately after a mapped symbol on a sample track to trigger it only
+once and let it play to the end of the sample:
+
+```yaml
+map:
+  - x: 60
+patterns:
+  - x+
+beats: 1
+```
+
+The `+` is a modifier, not a timed pattern step. Here `x` is triggered on the
+first pass, is not stopped at later step boundaries, and is not triggered again
+when the pattern loops. Muting the track still stops it. This is useful for long
+samples such as risers, drops, ambience, and other one-shot effects. `+` is only
+supported on sample tracks; use Tie Steps for SoundFont notes.
 
 ### Multiple Pattern Lanes
 

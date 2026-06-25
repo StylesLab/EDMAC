@@ -121,7 +121,7 @@ public sealed class Player : IDisposable
                         track.Channel,
                         0,
                         0),
-                    ScheduledNoteKind.NoteOffAll));
+                    ScheduledNoteKind.NoteOffAllIncludingPlayToCompletion));
             }
         }
 
@@ -175,9 +175,12 @@ public sealed class Player : IDisposable
                 {
                     Track track = song.Tracks[item.TrackIndex];
 
-                    if (item.Kind == ScheduledNoteKind.NoteOffAll)
+                    if (item.Kind is ScheduledNoteKind.NoteOffAll or
+                        ScheduledNoteKind.NoteOffAllIncludingPlayToCompletion)
                     {
-                        instruments[item.TrackIndex].StopChannel(item.Note.Channel);
+                        instruments[item.TrackIndex].StopChannel(
+                            item.Note.Channel,
+                            item.Kind == ScheduledNoteKind.NoteOffAllIncludingPlayToCompletion);
                         continue;
                     }
 
@@ -189,7 +192,8 @@ public sealed class Player : IDisposable
                     instruments[item.TrackIndex].NoteOn(
                         item.Note.Channel,
                         item.Note.Note,
-                        item.Note.Velocity);
+                        item.Note.Velocity,
+                        item.Kind == ScheduledNoteKind.NoteOnPlayToCompletion);
                 }
             }
         }

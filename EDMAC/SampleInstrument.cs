@@ -39,7 +39,7 @@ public sealed class SampleInstrument : IInstrument
 
     public float Amp { get; }
 
-    public void NoteOn(int channel, int note, int velocity)
+    public void NoteOn(int channel, int note, int velocity, bool playToCompletion = false)
     {
         double pitchRatio = Math.Pow(
             2.0,
@@ -55,6 +55,7 @@ public sealed class SampleInstrument : IInstrument
             voice.Position = 0;
             voice.Increment = increment;
             voice.Gain = gain;
+            voice.PlayToCompletion = playToCompletion;
         }
     }
 
@@ -98,13 +99,14 @@ public sealed class SampleInstrument : IInstrument
         }
     }
 
-    public void StopChannel(int channel)
+    public void StopChannel(int channel, bool includePlayToCompletion = false)
     {
         lock (voiceLock)
         {
             foreach (Voice voice in voices)
             {
-                if (voice.Channel == channel)
+                if (voice.Channel == channel &&
+                    (includePlayToCompletion || !voice.PlayToCompletion))
                 {
                     voice.Active = false;
                 }
@@ -165,5 +167,7 @@ public sealed class SampleInstrument : IInstrument
         public double Increment;
 
         public float Gain;
+
+        public bool PlayToCompletion;
     }
 }

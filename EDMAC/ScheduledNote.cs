@@ -14,5 +14,7 @@ internal readonly record struct ScheduledTrackNote(
 internal enum ScheduledNoteKind
 {
     NoteOffAll,
-    NoteOn
+    NoteOffAllIncludingPlayToCompletion,
+    NoteOn,
+    NoteOnPlayToCompletion
 }

@@ -258,6 +258,12 @@ public static class SongLoader
                 bpm))
             .ToArray();
 
+        if (!hasSample && patterns.Any(pattern => pattern.HasPlayToCompletionSteps))
+        {
+            throw new InvalidDataException(
+                $"Track '{definition.Name}' uses '+', which is only supported for sample tracks.");
+        }
+
         ValidatePatternSymbols(definition.Name, patterns, mappings);
 
         return new Track
@@ -363,10 +369,11 @@ public static class SongLoader
                 if (symbolText.Length != 1 ||
                     symbolText[0] == Pattern.RestSymbol ||
                     symbolText[0] == Pattern.TieSymbol ||
+                    symbolText[0] == Pattern.PlayToCompletionSymbol ||
                     symbolText[0] == '|')
                 {
                     throw new InvalidDataException(
-                        $"Track '{definition.Name}' mapping keys must be one character and cannot be '.', '>', or '|'.");
+                        $"Track '{definition.Name}' mapping keys must be one character and cannot be '.', '>', '+', or '|'.");
                 }
 
                 NoteMapping mapping = ParseMappingValue(
