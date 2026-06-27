@@ -80,9 +80,14 @@ public sealed class Player : IDisposable
         }
     }
 
-    public void RenderToFile(string outputPath, double seconds)
+    public void RenderToFile(
+        string outputPath,
+        double seconds,
+        ConsoleKey? selectedControl = null,
+        Func<Track, bool>? trackFilter = null)
     {
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(seconds);
+        song.InitializeTrackEnabledStates(selectedControl, trackFilter);
 
         string fullOutputPath = Path.GetFullPath(outputPath);
         string? outputDirectory = Path.GetDirectoryName(fullOutputPath);
@@ -94,7 +99,7 @@ public sealed class Player : IDisposable
         var sequencer = new Sequencer(song, audioEngine, noteQueue.Writer);
         long totalFrames = checked((long)Math.Round(seconds * audioEngine.WaveFormat.SampleRate));
         int blockAlign = audioEngine.WaveFormat.BlockAlign;
-        int bufferFrames = Math.Min(audioEngine.WaveFormat.SampleRate, 8192);
+        int bufferFrames = 256;
         var buffer = new byte[bufferFrames * blockAlign];
 
         using var writer = new WaveFileWriter(fullOutputPath, audioEngine.WaveFormat);
@@ -110,6 +115,54 @@ public sealed class Player : IDisposable
             audioEngine.Read(buffer, 0, bytes);
             writer.Write(buffer, 0, bytes);
             renderedFrames += frames;
+        }
+
+        DispatchPendingNotes();
+    }
+
+    public void RenderArrangementToFile(
+        string outputPath,
+        Func<Track, bool>? trackFilter = null)
+    {
+        if (song.Arrangement.Count == 0)
+        {
+            throw new InvalidOperationException(
+                "The song does not define an arrangement.");
+        }
+
+        string fullOutputPath = Path.GetFullPath(outputPath);
+        string? outputDirectory = Path.GetDirectoryName(fullOutputPath);
+        if (!string.IsNullOrWhiteSpace(outputDirectory))
+        {
+            Directory.CreateDirectory(outputDirectory);
+        }
+
+        var sequencer = new Sequencer(song, audioEngine, noteQueue.Writer);
+        int blockAlign = audioEngine.WaveFormat.BlockAlign;
+        int bufferFrames = 256;
+        var buffer = new byte[bufferFrames * blockAlign];
+
+        using var writer = new WaveFileWriter(fullOutputPath, audioEngine.WaveFormat);
+
+        foreach (ArrangementStep step in song.Arrangement)
+        {
+            ApplyRenderTrackControl(step.Control, trackFilter);
+
+            long segmentFrames = checked((long)Math.Round(
+                step.Bars * 4.0 * 60.0 / song.Bpm * audioEngine.WaveFormat.SampleRate));
+            long renderedFrames = 0;
+
+            while (renderedFrames < segmentFrames)
+            {
+                sequencer.ProcessPosition(audioEngine.SamplePosition);
+                DispatchPendingNotes();
+
+                int frames = (int)Math.Min(bufferFrames, segmentFrames - renderedFrames);
+                int bytes = frames * blockAlign;
+                audioEngine.Read(buffer, 0, bytes);
+                writer.Write(buffer, 0, bytes);
+                renderedFrames += frames;
+            }
         }
 
         DispatchPendingNotes();
@@ -162,6 +215,34 @@ public sealed class Player : IDisposable
         }
 
         ConsoleUi.Control($"Tracks={key} enabled={FormatEnabledTracks()}");
+    }
+
+    private void ApplyRenderTrackControl(
+        ConsoleKey control,
+        Func<Track, bool>? trackFilter)
+    {
+        for (var trackIndex = 0; trackIndex < song.Tracks.Count; trackIndex++)
+        {
+            previousTrackEnabledStates[trackIndex] = song.Tracks[trackIndex].Enabled;
+        }
+
+        song.ApplyTrackControl(control, trackFilter);
+
+        for (var trackIndex = 0; trackIndex < song.Tracks.Count; trackIndex++)
+        {
+            Track track = song.Tracks[trackIndex];
+            if (previousTrackEnabledStates[trackIndex] && !track.Enabled)
+            {
+                noteQueue.Writer.TryWrite(new ScheduledTrackNote(
+                    trackIndex,
+                    new ScheduledNote(
+                        audioEngine.SamplePosition,
+                        track.Channel,
+                        0,
+                        0),
+                    ScheduledNoteKind.NoteOffAllIncludingPlayToCompletion));
+            }
+        }
     }
 
     public (bool IsRecording, string? Path) ToggleRecording(string recordingsDirectory)

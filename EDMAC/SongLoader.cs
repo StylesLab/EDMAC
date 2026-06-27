@@ -42,6 +42,9 @@ public static class SongLoader
         ValidateResolvedMappings(tracks, progressions);
         ValidateEffects(tracks, sampleRate, definition.Bpm);
         ConsoleKey? startOnControl = ResolveStartOnControl(definition.StartOn, tracks);
+        IReadOnlyList<ArrangementStep> arrangement = ParseArrangement(
+            definition.Arrangement,
+            tracks);
 
         return new Song
         {
@@ -49,6 +52,7 @@ public static class SongLoader
             SampleRate = sampleRate,
             StartOnControl = startOnControl,
             Progressions = progressions,
+            Arrangement = arrangement,
             Tracks = tracks
         };
     }
@@ -282,9 +286,44 @@ public static class SongLoader
             Amp = definition.Amp,
             Effects = ParseEffects(definition.Name, definition.Effects),
             Controls = controls,
+            Groups = ParseGroups(definition.Group),
             NoteMappings = mappings,
             Patterns = patterns
         };
+    }
+
+    private static IReadOnlyList<ArrangementStep> ParseArrangement(
+        IReadOnlyList<ArrangementStepDefinition> definitions,
+        IReadOnlyList<Track> tracks)
+    {
+        var arrangement = new List<ArrangementStep>(definitions.Count);
+
+        foreach (ArrangementStepDefinition definition in definitions)
+        {
+            if (definition.Bars <= 0)
+            {
+                throw new InvalidDataException(
+                    "Arrangement step bars must be greater than zero.");
+            }
+
+            ConsoleKey control = ParseControl(
+                definition.Control,
+                "Arrangement step");
+
+            if (!tracks.Any(track => track.HasControl(control)))
+            {
+                throw new InvalidDataException(
+                    $"Arrangement control '{definition.Control}' does not match any track control.");
+            }
+
+            arrangement.Add(new ArrangementStep
+            {
+                Control = control,
+                Bars = definition.Bars
+            });
+        }
+
+        return arrangement;
     }
 
     private static string ResolveAssetPath(string path, string songDirectory)
@@ -487,6 +526,18 @@ public static class SongLoader
         return parsed;
     }
 
+    private static IReadOnlySet<string> ParseGroups(string groups)
+    {
+        if (string.IsNullOrWhiteSpace(groups))
+        {
+            return new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        }
+
+        return groups
+            .Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+    }
+
     private static ConsoleKey? ResolveStartOnControl(string startOn, IReadOnlyList<Track> tracks)
     {
         ConsoleKey[] availableControls = tracks
@@ -565,7 +616,16 @@ public static class SongLoader
 
         public List<ProgressionDefinition> Progressions { get; set; } = [];
 
+        public List<ArrangementStepDefinition> Arrangement { get; set; } = [];
+
         public List<TrackDefinition> Tracks { get; set; } = [];
+    }
+
+    private sealed class ArrangementStepDefinition
+    {
+        public string Control { get; set; } = string.Empty;
+
+        public int Bars { get; set; }
     }
 
     private sealed class ProgressionDefinition
@@ -609,5 +669,7 @@ public static class SongLoader
         public int Beats { get; set; }
 
         public string Control { get; set; } = string.Empty;
+
+        public string Group { get; set; } = string.Empty;
     }
 }

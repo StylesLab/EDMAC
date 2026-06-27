@@ -13,6 +13,8 @@ public sealed class Song
 
     public required IReadOnlyList<ChordProgression> Progressions { get; init; }
 
+    public required IReadOnlyList<ArrangementStep> Arrangement { get; init; }
+
     public required IReadOnlyList<Track> Tracks { get; init; }
 
     public double SamplesPerChordQuarter => SampleRate * 60.0 / Bpm;
@@ -63,19 +65,21 @@ public sealed class Song
         return null;
     }
 
-    public void InitializeTrackEnabledStates()
+    public void InitializeTrackEnabledStates(
+        ConsoleKey? selectedControl = null,
+        Func<Track, bool>? trackFilter = null)
     {
         if (!HasTrackControls)
         {
             foreach (Track track in Tracks)
             {
-                track.SetEnabled(true);
+                track.SetEnabled(trackFilter?.Invoke(track) ?? true);
             }
 
             return;
         }
 
-        ApplyTrackControl(StartOnControl!.Value);
+        ApplyTrackControl(selectedControl ?? StartOnControl!.Value, trackFilter);
     }
 
     public bool HasTrackControl(ConsoleKey control)
@@ -83,13 +87,22 @@ public sealed class Song
         return Tracks.Any(track => track.HasControl(control));
     }
 
-    public void ApplyTrackControl(ConsoleKey control)
+    public void ApplyTrackControl(ConsoleKey control, Func<Track, bool>? trackFilter = null)
     {
         Interlocked.Exchange(ref activeTrackControl, (int)control);
 
         foreach (Track track in Tracks)
         {
-            track.SetEnabled(!track.HasControls || track.HasControl(control));
+            bool enabledByControl = !track.HasControls || track.HasControl(control);
+            bool enabledByFilter = trackFilter?.Invoke(track) ?? true;
+            track.SetEnabled(enabledByControl && enabledByFilter);
         }
     }
+}
+
+public sealed class ArrangementStep
+{
+    public required ConsoleKey Control { get; init; }
+
+    public required int Bars { get; init; }
 }

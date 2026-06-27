@@ -48,64 +48,77 @@ public sealed class Sequencer
             long absoluteStep = (long)Math.Floor(
                 samplePosition / timingPattern.SamplesPerStep);
 
-            if (absoluteStep == lastAbsoluteSteps[trackIndex])
+            if (absoluteStep <= lastAbsoluteSteps[trackIndex])
             {
                 continue;
             }
 
-            lastAbsoluteSteps[trackIndex] = absoluteStep;
-            long stepSamplePosition = timingPattern.GetSamplePosition(absoluteStep);
-            bool isTieStep = track.Patterns.Any(pattern => pattern.IsTieStep(absoluteStep));
-
-            if (!isTieStep)
+            for (long step = lastAbsoluteSteps[trackIndex] + 1; step <= absoluteStep; step++)
             {
+                ProcessStep(trackIndex, track, timingPattern, step);
+            }
+
+            lastAbsoluteSteps[trackIndex] = absoluteStep;
+        }
+    }
+
+    private void ProcessStep(
+        int trackIndex,
+        Track track,
+        Pattern timingPattern,
+        long absoluteStep)
+    {
+        long stepSamplePosition = timingPattern.GetSamplePosition(absoluteStep);
+        bool isTieStep = track.Patterns.Any(pattern => pattern.IsTieStep(absoluteStep));
+
+        if (!isTieStep)
+        {
+            writer.TryWrite(new ScheduledTrackNote(
+                trackIndex,
+                new ScheduledNote(
+                    stepSamplePosition,
+                    track.Channel,
+                    0,
+                    0),
+                ScheduledNoteKind.NoteOffAll));
+        }
+
+        if (!track.Enabled)
+        {
+            return;
+        }
+
+        Chord? chord = song.GetChord(stepSamplePosition);
+
+        foreach (Pattern pattern in track.Patterns)
+        {
+            char symbol = pattern.GetSymbol(absoluteStep);
+            if (symbol == Pattern.RestSymbol ||
+                symbol == Pattern.TieSymbol ||
+                !pattern.ShouldTrigger(absoluteStep) ||
+                !track.NoteMappings.TryGetValue(symbol, out NoteMapping? mapping))
+            {
+                continue;
+            }
+
+            for (var valueIndex = 0; valueIndex < mapping.Count; valueIndex++)
+            {
+                int note = mapping.Resolve(valueIndex, chord);
+                if (note is < 0 or > 127)
+                {
+                    continue;
+                }
+
                 writer.TryWrite(new ScheduledTrackNote(
                     trackIndex,
                     new ScheduledNote(
                         stepSamplePosition,
                         track.Channel,
-                        0,
-                        0),
-                    ScheduledNoteKind.NoteOffAll));
-            }
-
-            if (!track.Enabled)
-            {
-                continue;
-            }
-
-            Chord? chord = song.GetChord(stepSamplePosition);
-
-            foreach (Pattern pattern in track.Patterns)
-            {
-                char symbol = pattern.GetSymbol(absoluteStep);
-                if (symbol == Pattern.RestSymbol ||
-                    symbol == Pattern.TieSymbol ||
-                    !pattern.ShouldTrigger(absoluteStep) ||
-                    !track.NoteMappings.TryGetValue(symbol, out NoteMapping? mapping))
-                {
-                    continue;
-                }
-
-                for (var valueIndex = 0; valueIndex < mapping.Count; valueIndex++)
-                {
-                    int note = mapping.Resolve(valueIndex, chord);
-                    if (note is < 0 or > 127)
-                    {
-                        continue;
-                    }
-
-                    writer.TryWrite(new ScheduledTrackNote(
-                        trackIndex,
-                        new ScheduledNote(
-                            stepSamplePosition,
-                            track.Channel,
-                            note,
-                            track.Velocity),
-                        pattern.PlaysToCompletion(absoluteStep)
-                            ? ScheduledNoteKind.NoteOnPlayToCompletion
-                            : ScheduledNoteKind.NoteOn));
-                }
+                        note,
+                        track.Velocity),
+                    pattern.PlaysToCompletion(absoluteStep)
+                        ? ScheduledNoteKind.NoteOnPlayToCompletion
+                        : ScheduledNoteKind.NoteOn));
             }
         }
     }

@@ -64,6 +64,7 @@ Render a fixed-length WAV file:
 
 ```powershell
 dotnet run --project EDMAC\EDMAC.csproj -- render EDMAC\example\song.yml --seconds 32 --out take.wav
+dotnet run --project EDMAC\EDMAC.csproj -- render EDMAC\example\song.yml --control f4 --seconds 16 --out chorus.wav
 ```
 
 When running the built executable directly:
@@ -72,6 +73,7 @@ When running the built executable directly:
 EDMAC\bin\Debug\net10.0\edmac.exe EDMAC\example\song.yml
 EDMAC\bin\Debug\net10.0\edmac.exe validate EDMAC\example\song.yml
 EDMAC\bin\Debug\net10.0\edmac.exe render EDMAC\example\song.yml --seconds 32 --out take.wav
+EDMAC\bin\Debug\net10.0\edmac.exe render EDMAC\example\song.yml --arrangement --out full.wav
 ```
 
 The repository includes a commented showcase song at
@@ -121,6 +123,14 @@ progressions:
       - A
     control: f10
 
+arrangement:
+  - control: f1
+    bars: 12
+  - control: f2
+    bars: 16
+  - control: f4
+    bars: 8
+
 tracks:
   - name: kick
     soundfont: 'C:\SoundFonts\Drums.sf2'
@@ -135,6 +145,7 @@ tracks:
       - x|x|x|x
     beats: 4
     control: f1
+    group: drums
 
   - name: snare
     soundfont: 'C:\SoundFonts\Drums.sf2'
@@ -145,6 +156,7 @@ tracks:
     beats: 16
     amp: 0.8
     control: f2
+    group: drums
 
   - name: chords
     soundfont: 'C:\SoundFonts\Sawtooth Piano.sf2'
@@ -168,6 +180,7 @@ This example:
 - Plays the root, third, and fifth of the current chord for a full bar.
 - Starts with the `verse` progression.
 - Starts with the `F1` track group active.
+- Defines a render arrangement that switches from `F1` to `F2` to `F4`.
 - Selects `verse` with `F9` and `chorus` with `F10`.
 - Selects the kick, snare, and chords track groups with `F1`, `F2`, and `F3`.
 
@@ -214,6 +227,24 @@ bar and `G:1` lasts one quarter of a bar. A progression loops after its final
 chord.
 
 The first progression in the file is active when playback starts.
+
+### `arrangement`
+
+Optional. Defines a fixed render timeline made from track control sections:
+
+```yaml
+arrangement:
+  - control: f1
+    bars: 12
+  - control: f2
+    bars: 16
+  - control: f4
+    bars: 8
+```
+
+Each step selects the given track control as if that function key had been
+pressed, then renders for the requested number of four-beat bars. Controls must
+match track `control` values, and `bars` must be greater than zero.
 
 ### `tracks`
 
@@ -328,6 +359,7 @@ MIDI note lengths. Track note lengths are still controlled by each track's
 | `patterns` | Yes | - | One or more simultaneous pattern lanes |
 | `beats` | Yes | - | Number of steps per four-beat bar |
 | `control` | No | always enabled | One or more comma-separated function-key groups |
+| `group` | No | none | One or more comma-separated render stem groups |
 
 The older singular `pattern:` field is also accepted for songs containing one
 pattern:
@@ -357,6 +389,21 @@ control: f1,f2
 When a function key is selected, tracks containing that key are enabled.
 Controlled tracks that do not contain that key are muted. Tracks with no
 `control` field are always enabled.
+
+Render groups label tracks for stem-style offline rendering:
+
+```yaml
+group: drums
+```
+
+or several groups:
+
+```yaml
+group: drums,breaks
+```
+
+Groups do not affect live playback. They are only used by `edmac render
+--group`.
 
 ### SoundFont Paths
 
@@ -841,11 +888,41 @@ playback UI:
 
 ```powershell
 edmac render song.yml --seconds 32 --out take.wav
+edmac render song.yml --control f4 --seconds 16 --out chorus.wav
 ```
 
-`--seconds` is the rendered duration. `--out` is the output WAV path. Relative
-song asset paths are still resolved relative to the YAML file, and relative
-output paths are resolved from the current terminal directory.
+`--seconds` is the rendered duration. If omitted for a non-arrangement render,
+EDMAC renders 16 bars at the song tempo. `--out` is the output WAV path.
+Relative song asset paths are still resolved relative to the YAML file, and
+relative output paths are resolved from the current terminal directory.
+
+Use `--control` to render as if a function-key section had been selected at
+playback start:
+
+```powershell
+edmac render song.yml --control f4 --seconds 16 --out chorus.wav
+```
+
+Use `--arrangement` to render the whole top-level `arrangement` timeline:
+
+```powershell
+edmac render song.yml --arrangement --out full.wav
+```
+
+Use `--tracks` to render only named tracks:
+
+```powershell
+edmac render song.yml --control f1 --tracks kick,snare,hats --out drums.wav
+```
+
+Use `--group` to render tracks labeled with a render group:
+
+```powershell
+edmac render song.yml --control f1 --group drums --out drums.wav
+```
+
+`--tracks` and `--group` can also be combined with `--arrangement` for
+arranged stems.
 
 ## Minimal Drum Song
 
