@@ -4,8 +4,8 @@
 
 EDMAC is a real-time, YAML-driven tracker-style music engine for .NET 10. It
 uses SoundFonts for instruments, loops patterns indefinitely, supports
-multiple simultaneous pattern lanes, and lets you mute tracks or select chord
-progressions with function keys.
+multiple simultaneous pattern lanes, lets you mute tracks or select chord
+progressions with function keys, and can render songs directly to WAV files.
 
 EDMAC uses:
 
@@ -60,11 +60,18 @@ Validate a song without starting audio:
 dotnet run --project EDMAC\EDMAC.csproj -- validate EDMAC\example\song.yml
 ```
 
+Render a fixed-length WAV file:
+
+```powershell
+dotnet run --project EDMAC\EDMAC.csproj -- render EDMAC\example\song.yml --seconds 32 --out take.wav
+```
+
 When running the built executable directly:
 
 ```powershell
 EDMAC\bin\Debug\net10.0\edmac.exe EDMAC\example\song.yml
 EDMAC\bin\Debug\net10.0\edmac.exe validate EDMAC\example\song.yml
+EDMAC\bin\Debug\net10.0\edmac.exe render EDMAC\example\song.yml --seconds 32 --out take.wav
 ```
 
 The repository includes a commented showcase song at
@@ -826,6 +833,19 @@ Pattern[0] Length=1 Steps=z
 SamplesPerStep=88200
 Amp=0.5
 ```
+
+## Rendering
+
+Render writes the mixed output directly to a WAV file without opening the live
+playback UI:
+
+```powershell
+edmac render song.yml --seconds 32 --out take.wav
+```
+
+`--seconds` is the rendered duration. `--out` is the output WAV path. Relative
+song asset paths are still resolved relative to the YAML file, and relative
+output paths are resolved from the current terminal directory.
 
 ## Minimal Drum Song
 

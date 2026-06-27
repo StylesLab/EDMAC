@@ -1,5 +1,6 @@
 using System.Threading.Channels;
 using EDMAC.Effects;
+using NAudio.Wave;
 
 namespace EDMAC;
 
@@ -77,6 +78,41 @@ public sealed class Player : IDisposable
             {
             }
         }
+    }
+
+    public void RenderToFile(string outputPath, double seconds)
+    {
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(seconds);
+
+        string fullOutputPath = Path.GetFullPath(outputPath);
+        string? outputDirectory = Path.GetDirectoryName(fullOutputPath);
+        if (!string.IsNullOrWhiteSpace(outputDirectory))
+        {
+            Directory.CreateDirectory(outputDirectory);
+        }
+
+        var sequencer = new Sequencer(song, audioEngine, noteQueue.Writer);
+        long totalFrames = checked((long)Math.Round(seconds * audioEngine.WaveFormat.SampleRate));
+        int blockAlign = audioEngine.WaveFormat.BlockAlign;
+        int bufferFrames = Math.Min(audioEngine.WaveFormat.SampleRate, 8192);
+        var buffer = new byte[bufferFrames * blockAlign];
+
+        using var writer = new WaveFileWriter(fullOutputPath, audioEngine.WaveFormat);
+
+        long renderedFrames = 0;
+        while (renderedFrames < totalFrames)
+        {
+            sequencer.ProcessPosition(audioEngine.SamplePosition);
+            DispatchPendingNotes();
+
+            int frames = (int)Math.Min(bufferFrames, totalFrames - renderedFrames);
+            int bytes = frames * blockAlign;
+            audioEngine.Read(buffer, 0, bytes);
+            writer.Write(buffer, 0, bytes);
+            renderedFrames += frames;
+        }
+
+        DispatchPendingNotes();
     }
 
     public void HandleKey(ConsoleKey key)
@@ -173,33 +209,46 @@ public sealed class Player : IDisposable
             {
                 while (reader.TryRead(out ScheduledTrackNote item))
                 {
-                    Track track = song.Tracks[item.TrackIndex];
-
-                    if (item.Kind is ScheduledNoteKind.NoteOffAll or
-                        ScheduledNoteKind.NoteOffAllIncludingPlayToCompletion)
-                    {
-                        instruments[item.TrackIndex].StopChannel(
-                            item.Note.Channel,
-                            item.Kind == ScheduledNoteKind.NoteOffAllIncludingPlayToCompletion);
-                        continue;
-                    }
-
-                    if (!track.Enabled)
-                    {
-                        continue;
-                    }
-
-                    instruments[item.TrackIndex].NoteOn(
-                        item.Note.Channel,
-                        item.Note.Note,
-                        item.Note.Velocity,
-                        item.Kind == ScheduledNoteKind.NoteOnPlayToCompletion);
+                    DispatchNote(item);
                 }
             }
         }
         catch (OperationCanceledException)
         {
         }
+    }
+
+    private void DispatchPendingNotes()
+    {
+        while (noteQueue.Reader.TryRead(out ScheduledTrackNote item))
+        {
+            DispatchNote(item);
+        }
+    }
+
+    private void DispatchNote(ScheduledTrackNote item)
+    {
+        Track track = song.Tracks[item.TrackIndex];
+
+        if (item.Kind is ScheduledNoteKind.NoteOffAll or
+            ScheduledNoteKind.NoteOffAllIncludingPlayToCompletion)
+        {
+            instruments[item.TrackIndex].StopChannel(
+                item.Note.Channel,
+                item.Kind == ScheduledNoteKind.NoteOffAllIncludingPlayToCompletion);
+            return;
+        }
+
+        if (!track.Enabled)
+        {
+            return;
+        }
+
+        instruments[item.TrackIndex].NoteOn(
+            item.Note.Channel,
+            item.Note.Note,
+            item.Note.Velocity,
+            item.Kind == ScheduledNoteKind.NoteOnPlayToCompletion);
     }
 
     private void PrintStartupDiagnostics()
