@@ -185,7 +185,7 @@ public sealed class HotReloadingPlayer
 
     private static ConsoleKey MapKey(ConsoleKeyInfo keyInfo)
     {
-        if ((keyInfo.Modifiers & ConsoleModifiers.Control) != 0 &&
+        if ((keyInfo.Modifiers & ConsoleModifiers.Alt) != 0 &&
             keyInfo.Key >= ConsoleKey.D1 && keyInfo.Key <= ConsoleKey.D9)
         {
             return ConsoleKey.F1 + (keyInfo.Key - ConsoleKey.D1);
