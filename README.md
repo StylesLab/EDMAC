@@ -91,6 +91,7 @@ Playback keys:
 | `R` | Start / stop recording the mixed output to WAV |
 | `Q` | Quit |
 | `Escape` | Quit |
+| `Ctrl+1` – `Ctrl+9` | Same as `F1` – `F9` (for terminals that intercept function keys) |
 
 Recordings are written under a `recordings` folder beside the running app and
 are date/time stamped, for example `recordings/edmac-20260616-213045-123.wav`.
@@ -803,6 +804,7 @@ Global transport controls:
 | `R` | Start / stop recording the mixed output to WAV |
 | `Q` | Quit playback |
 | `Escape` | Quit playback |
+| `Ctrl+1` – `Ctrl+9` | Same as `F1` – `F9` (for terminals that intercept function keys) |
 
 Recordings are saved under `recordings` beside the running app executable. Each
 recording uses a date/time-stamped file name so previous takes are not
@@ -824,8 +826,8 @@ tracks:
     control: f2
 ```
 
-- Press `F1` to enable `drums` and `bass`.
-- Press `F2` to enable `bass` and `lead`.
+- Press `F1` (or `Ctrl+1`) to enable `drums` and `bass`.
+- Press `F2` (or `Ctrl+2`) to enable `bass` and `lead`.
 - Tracks can belong to multiple groups by separating controls with commas.
 - Tracks with no `control` field are always enabled.
 - Tracks muted by a group change immediately stop their current notes.

@@ -183,6 +183,17 @@ public sealed class HotReloadingPlayer
         player?.Dispose();
     }
 
+    private static ConsoleKey MapKey(ConsoleKeyInfo keyInfo)
+    {
+        if ((keyInfo.Modifiers & ConsoleModifiers.Control) != 0 &&
+            keyInfo.Key >= ConsoleKey.D1 && keyInfo.Key <= ConsoleKey.D9)
+        {
+            return ConsoleKey.F1 + (keyInfo.Key - ConsoleKey.D1);
+        }
+
+        return keyInfo.Key;
+    }
+
     private Task ReadKeyboardAsync(CancellationTokenSource cancellation)
     {
         return Task.Factory.StartNew(
@@ -199,7 +210,7 @@ public sealed class HotReloadingPlayer
 
         while (!cancellation.IsCancellationRequested)
         {
-            ConsoleKey key = Console.ReadKey(intercept: true).Key;
+            ConsoleKey key = MapKey(Console.ReadKey(intercept: true));
             if (key is ConsoleKey.Escape or ConsoleKey.Q)
             {
                 return;
