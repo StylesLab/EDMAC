@@ -33,6 +33,7 @@ public sealed class Player : IDisposable
         previousTrackEnabledStates = new bool[song.Tracks.Count];
 
         audioEngine = new AudioEngine(song.Tracks, instruments, effects, song.SampleRate);
+        audioEngine.StoppedUnexpectedly += OnAudioEngineStoppedUnexpectedly;
         noteQueue = Channel.CreateBounded<ScheduledTrackNote>(
             new BoundedChannelOptions(1024)
             {
@@ -42,6 +43,8 @@ public sealed class Player : IDisposable
             });
 
     }
+
+    public event EventHandler<AudioEngineStoppedEventArgs>? PlaybackStoppedUnexpectedly;
 
     public async Task RunAsync(CancellationToken cancellationToken)
     {
@@ -264,6 +267,11 @@ public sealed class Player : IDisposable
 
         disposed = true;
         audioEngine.Dispose();
+    }
+
+    private void OnAudioEngineStoppedUnexpectedly(object? sender, AudioEngineStoppedEventArgs args)
+    {
+        PlaybackStoppedUnexpectedly?.Invoke(this, args);
     }
 
     private static Task StartDedicatedWorker(

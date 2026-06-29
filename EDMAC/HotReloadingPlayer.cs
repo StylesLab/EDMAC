@@ -7,6 +7,7 @@ public sealed class HotReloadingPlayer
     private readonly string yamlPath;
     private readonly object playerLock = new();
     private readonly Channel<bool> reloadSignals;
+    private readonly Channel<AudioEngineStoppedEventArgs> playbackStopSignals;
     private Player? currentPlayer;
     private CancellationTokenSource? currentPlaybackCancellation;
     private Task? currentPlaybackTask;
@@ -18,6 +19,13 @@ public sealed class HotReloadingPlayer
     {
         this.yamlPath = Path.GetFullPath(yamlPath);
         reloadSignals = Channel.CreateBounded<bool>(
+            new BoundedChannelOptions(1)
+            {
+                FullMode = BoundedChannelFullMode.DropOldest,
+                SingleReader = true,
+                SingleWriter = false
+            });
+        playbackStopSignals = Channel.CreateBounded<AudioEngineStoppedEventArgs>(
             new BoundedChannelOptions(1)
             {
                 FullMode = BoundedChannelFullMode.DropOldest,
@@ -41,13 +49,14 @@ public sealed class HotReloadingPlayer
 
         Task keyboardTask = ReadKeyboardAsync(hostCancellation);
         Task reloadTask = ProcessReloadsAsync(hostCancellation.Token);
+        Task playbackStopTask = ProcessPlaybackStopsAsync(hostCancellation.Token);
 
         await keyboardTask;
         hostCancellation.Cancel();
 
         try
         {
-            await reloadTask;
+            await Task.WhenAll(reloadTask, playbackStopTask);
         }
         catch (OperationCanceledException)
         {
@@ -95,6 +104,30 @@ public sealed class HotReloadingPlayer
         }
     }
 
+    private async Task ProcessPlaybackStopsAsync(CancellationToken cancellationToken)
+    {
+        await foreach (AudioEngineStoppedEventArgs args in
+            playbackStopSignals.Reader.ReadAllAsync(cancellationToken))
+        {
+            if (paused || currentSong is null)
+            {
+                continue;
+            }
+
+            string reason = args.Exception is null
+                ? "audio output stopped"
+                : $"audio output stopped: {args.Exception.Message}";
+            ConsoleUi.Warning($"{reason}; restarting playback.");
+
+            await StopCurrentPlayerAsync();
+
+            if (!paused && currentSong is not null)
+            {
+                StartPlayer(currentSong, printStartupDiagnostics: false);
+            }
+        }
+    }
+
     private async Task ReloadAsync()
     {
         Song song;
@@ -139,6 +172,7 @@ public sealed class HotReloadingPlayer
     {
         var nextPlayer = new Player(song, printStartupDiagnostics);
         var nextCancellation = new CancellationTokenSource();
+        nextPlayer.PlaybackStoppedUnexpectedly += OnPlaybackStoppedUnexpectedly;
         Task nextTask = nextPlayer.RunAsync(nextCancellation.Token);
 
         lock (playerLock)
@@ -147,6 +181,13 @@ public sealed class HotReloadingPlayer
             currentPlaybackCancellation = nextCancellation;
             currentPlaybackTask = nextTask;
         }
+    }
+
+    private void OnPlaybackStoppedUnexpectedly(
+        object? sender,
+        AudioEngineStoppedEventArgs args)
+    {
+        playbackStopSignals.Writer.TryWrite(args);
     }
 
     private async Task StopCurrentPlayerAsync()
@@ -164,6 +205,11 @@ public sealed class HotReloadingPlayer
             currentPlayer = null;
             currentPlaybackCancellation = null;
             currentPlaybackTask = null;
+        }
+
+        if (player is not null)
+        {
+            player.PlaybackStoppedUnexpectedly -= OnPlaybackStoppedUnexpectedly;
         }
 
         cancellation?.Cancel();

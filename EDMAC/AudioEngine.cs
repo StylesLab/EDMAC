@@ -21,6 +21,7 @@ public sealed class AudioEngine : IWaveProvider, IDisposable
     private readonly AudioRecorder recorder;
     private int effectBypassReads;
     private long samplePosition;
+    private bool stopRequested;
     private bool disposed;
 
     public AudioEngine(
@@ -39,6 +40,7 @@ public sealed class AudioEngine : IWaveProvider, IDisposable
             NumberOfBuffers = 3
         };
         recorder = new AudioRecorder(WaveFormat);
+        output.PlaybackStopped += OnPlaybackStopped;
         output.Init(this);
     }
 
@@ -48,9 +50,12 @@ public sealed class AudioEngine : IWaveProvider, IDisposable
 
     public bool IsRecording => recorder.IsRecording;
 
+    public event EventHandler<AudioEngineStoppedEventArgs>? StoppedUnexpectedly;
+
     public void Start()
     {
         ObjectDisposedException.ThrowIf(disposed, this);
+        stopRequested = false;
         output.Play();
     }
 
@@ -58,6 +63,7 @@ public sealed class AudioEngine : IWaveProvider, IDisposable
     {
         if (!disposed)
         {
+            stopRequested = true;
             output.Stop();
         }
     }
@@ -146,6 +152,18 @@ public sealed class AudioEngine : IWaveProvider, IDisposable
         }
     }
 
+    private void OnPlaybackStopped(object? sender, StoppedEventArgs args)
+    {
+        if (disposed || stopRequested)
+        {
+            return;
+        }
+
+        StoppedUnexpectedly?.Invoke(
+            this,
+            new AudioEngineStoppedEventArgs(args.Exception));
+    }
+
     public void Dispose()
     {
         if (disposed)
@@ -154,6 +172,8 @@ public sealed class AudioEngine : IWaveProvider, IDisposable
         }
 
         disposed = true;
+        stopRequested = true;
+        output.PlaybackStopped -= OnPlaybackStopped;
         output.Stop();
         output.Dispose();
         recorder.Dispose();
@@ -163,4 +183,14 @@ public sealed class AudioEngine : IWaveProvider, IDisposable
             instrument.StopAll();
         }
     }
+}
+
+public sealed class AudioEngineStoppedEventArgs : EventArgs
+{
+    public AudioEngineStoppedEventArgs(Exception? exception)
+    {
+        Exception = exception;
+    }
+
+    public Exception? Exception { get; }
 }
