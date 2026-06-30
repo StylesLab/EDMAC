@@ -78,7 +78,7 @@ EDMAC\bin\Debug\net10.0-windows10.0.19041.0\edmac.exe render EDMAC\example\song.
 
 The repository includes a commented showcase song at
 `EDMAC\example\song.yml`. It demonstrates SoundFonts, samples, chord-relative
-mappings, Tie Steps, track groups, progressions, and effects.
+mappings, Tie Steps, track controls, progressions, and effects.
 
 Playback loads the YAML and waits for you to press `Space` before starting.
 
@@ -125,6 +125,7 @@ progressions:
       - A
       - G
       - A
+    transpose: 1
     control: f10
 
 arrangement:
@@ -149,7 +150,6 @@ tracks:
       - x|x|x|x
     beats: 4
     control: f1
-    group: drums
 
   - name: snare
     soundfont: 'C:\SoundFonts\Drums.sf2'
@@ -160,7 +160,6 @@ tracks:
     beats: 16
     amp: 0.8
     control: f2
-    group: drums
 
   - name: chords
     soundfont: 'C:\SoundFonts\Sawtooth Piano.sf2'
@@ -185,7 +184,7 @@ This example:
 - Starts with the `verse` progression.
 - Starts with the `F1` track group active.
 - Defines a render arrangement that switches from `F1` to `F2` to `F4`.
-- Selects `verse` with `F9` and `chorus` with `F10`.
+- Selects `verse` with `F9` and `chorus` with `F10`; `chorus` is transposed up one semitone.
 - Selects the kick, snare, and chords track groups with `F1`, `F2`, and `F3`.
 
 ## Top-Level Fields
@@ -267,6 +266,7 @@ Each progression has these fields:
 | --- | --- | --- |
 | `name` | Yes | Unique progression name |
 | `chords` | Yes | One or more chord names, optionally with `:duration` |
+| `transpose` | No | Semitones to shift every chord in this progression; default is `0` |
 | `control` | Yes | Function key used to select or cycle the progression |
 
 Example:
@@ -280,11 +280,13 @@ progressions:
       - D
       - A:3
       - G:1
+    transpose: -1
     control: f9
 ```
 
 In that example, `Bm`, `G`, and `D` each last one bar. `A:3` lasts three
-quarters of a bar, then `G:1` lasts the final quarter of the bar.
+quarters of a bar, then `G:1` lasts the final quarter of the bar. The whole
+progression is transposed down one semitone.
 
 If progressions have different controls, pressing a control selects the
 matching progression. If several progressions share the same control,
@@ -363,7 +365,6 @@ MIDI note lengths. Track note lengths are still controlled by each track's
 | `patterns` | Yes | - | One or more simultaneous pattern lanes |
 | `beats` | Yes | - | Number of steps per four-beat bar |
 | `control` | No | always enabled | One or more comma-separated function-key groups |
-| `group` | No | none | One or more comma-separated render stem groups |
 
 The older singular `pattern:` field is also accepted for songs containing one
 pattern:
@@ -393,21 +394,6 @@ control: f1,f2
 When a function key is selected, tracks containing that key are enabled.
 Controlled tracks that do not contain that key are muted. Tracks with no
 `control` field are always enabled.
-
-Render groups label tracks for stem-style offline rendering:
-
-```yaml
-group: drums
-```
-
-or several groups:
-
-```yaml
-group: drums,breaks
-```
-
-Groups do not affect live playback. They are only used by `edmac render
---group`.
 
 ### SoundFont Paths
 
@@ -923,14 +909,7 @@ Use `--tracks` to render only named tracks:
 edmac render song.yml --control f1 --tracks kick,snare,hats --out drums.wav
 ```
 
-Use `--group` to render tracks labeled with a render group:
-
-```powershell
-edmac render song.yml --control f1 --group drums --out drums.wav
-```
-
-`--tracks` and `--group` can also be combined with `--arrangement` for
-arranged stems.
+`--tracks` can also be combined with `--arrangement` for arranged stems.
 
 ## Minimal Drum Song
 

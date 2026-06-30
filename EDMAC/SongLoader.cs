@@ -138,7 +138,11 @@ public static class SongLoader
             progressions.Add(new ChordProgression
             {
                 Name = definition.Name,
-                Steps = ParseProgressionSteps(definition.Name, definition.Chords),
+                Transpose = definition.Transpose,
+                Steps = ParseProgressionSteps(
+                    definition.Name,
+                    definition.Chords,
+                    definition.Transpose),
                 Control = ParseControl(
                     definition.Control,
                     $"Chord progression '{definition.Name}'")
@@ -150,7 +154,8 @@ public static class SongLoader
 
     private static IReadOnlyList<ChordProgressionStep> ParseProgressionSteps(
         string progressionName,
-        IReadOnlyList<string> chordTexts)
+        IReadOnlyList<string> chordTexts,
+        int transpose)
     {
         var steps = new List<ChordProgressionStep>(chordTexts.Count);
         int startQuarter = 0;
@@ -163,7 +168,7 @@ public static class SongLoader
 
             steps.Add(new ChordProgressionStep
             {
-                Chord = chord,
+                Chord = chord.Transpose(transpose),
                 DurationQuarters = durationQuarters,
                 StartQuarter = startQuarter
             });
@@ -286,7 +291,6 @@ public static class SongLoader
             Amp = definition.Amp,
             Effects = ParseEffects(definition.Name, definition.Effects),
             Controls = controls,
-            Groups = ParseGroups(definition.Group),
             NoteMappings = mappings,
             Patterns = patterns
         };
@@ -526,18 +530,6 @@ public static class SongLoader
         return parsed;
     }
 
-    private static IReadOnlySet<string> ParseGroups(string groups)
-    {
-        if (string.IsNullOrWhiteSpace(groups))
-        {
-            return new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        }
-
-        return groups
-            .Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries)
-            .ToHashSet(StringComparer.OrdinalIgnoreCase);
-    }
-
     private static ConsoleKey? ResolveStartOnControl(string startOn, IReadOnlyList<Track> tracks)
     {
         ConsoleKey[] availableControls = tracks
@@ -634,6 +626,8 @@ public static class SongLoader
 
         public List<string> Chords { get; set; } = [];
 
+        public int Transpose { get; set; }
+
         public string Control { get; set; } = string.Empty;
     }
 
@@ -669,7 +663,5 @@ public static class SongLoader
         public int Beats { get; set; }
 
         public string Control { get; set; } = string.Empty;
-
-        public string Group { get; set; } = string.Empty;
     }
 }

@@ -14,6 +14,7 @@ public static class SongValidator
         {
             Console.WriteLine(
                 $"Progression={progression.Name} Control={progression.Control} " +
+                $"Transpose={progression.Transpose} " +
                 $"Chords={string.Join(",", progression.Steps.Select(step => step.DisplayName))} " +
                 $"DurationQuarters={progression.TotalDurationQuarters}");
         }

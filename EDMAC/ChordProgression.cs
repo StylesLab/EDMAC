@@ -10,6 +10,8 @@ public sealed class ChordProgression
 
     public required ConsoleKey Control { get; init; }
 
+    public int Transpose { get; init; }
+
     public int TotalDurationQuarters => Steps.Sum(step => step.DurationQuarters);
 
     public Chord GetChordAtQuarter(int quarter)

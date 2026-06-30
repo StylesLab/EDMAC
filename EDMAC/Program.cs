@@ -128,7 +128,6 @@ internal static class Program
         ConsoleKey? control = null;
         bool useArrangement = false;
         IReadOnlySet<string> tracks = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        IReadOnlySet<string> groups = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
         for (var index = 2; index < args.Length; index++)
         {
@@ -164,12 +163,6 @@ internal static class Program
                 continue;
             }
 
-            if (argument.Equals("--group", StringComparison.OrdinalIgnoreCase))
-            {
-                groups = ParseCsv(ParseRequiredValue(args, ref index, "--group"));
-                continue;
-            }
-
             throw new ArgumentException($"Unknown render option '{argument}'.");
         }
 
@@ -189,8 +182,7 @@ internal static class Program
             outputPath,
             control,
             useArrangement,
-            tracks,
-            groups);
+            tracks);
     }
 
     private static double ParseRequiredPositiveDouble(
@@ -247,7 +239,7 @@ internal static class Program
 
     private static Func<Track, bool>? CreateTrackFilter(Song song, RenderOptions options)
     {
-        if (options.Tracks.Count == 0 && options.Groups.Count == 0)
+        if (options.Tracks.Count == 0)
         {
             return null;
         }
@@ -263,18 +255,7 @@ internal static class Program
                 $"Unknown render track(s): {string.Join(",", missingTracks)}.");
         }
 
-        string[] missingGroups = options.Groups
-            .Where(group => !song.Tracks.Any(track => track.Groups.Contains(group)))
-            .ToArray();
-        if (missingGroups.Length > 0)
-        {
-            throw new ArgumentException(
-                $"Unknown render group(s): {string.Join(",", missingGroups)}.");
-        }
-
-        return track =>
-            options.Tracks.Contains(track.Name) ||
-            track.Groups.Any(options.Groups.Contains);
+        return track => options.Tracks.Contains(track.Name);
     }
 
     private static double GetDefaultRenderSeconds(Song song)
@@ -288,6 +269,5 @@ internal static class Program
         string OutputPath,
         ConsoleKey? Control,
         bool UseArrangement,
-        IReadOnlySet<string> Tracks,
-        IReadOnlySet<string> Groups);
+        IReadOnlySet<string> Tracks);
 }

@@ -30,8 +30,6 @@ public sealed class Track
 
     public required IReadOnlySet<ConsoleKey> Controls { get; init; }
 
-    public required IReadOnlySet<string> Groups { get; init; }
-
     public required IReadOnlyDictionary<char, NoteMapping> NoteMappings { get; init; }
 
     public required IReadOnlyList<Pattern> Patterns { get; init; }

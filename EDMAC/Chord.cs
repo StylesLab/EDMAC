@@ -34,6 +34,13 @@ public sealed partial class Chord
 
     public bool IsMinor { get; }
 
+    public Chord Transpose(int semitones)
+    {
+        return semitones == 0
+            ? this
+            : new Chord(Name, checked(RootMidiNote + semitones), IsMinor);
+    }
+
     public int GetTone(int index)
     {
         int octave = Math.DivRem(index, intervals.Length, out int toneIndex);
