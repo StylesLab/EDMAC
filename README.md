@@ -70,10 +70,10 @@ dotnet run --project EDMAC\EDMAC.csproj -- render EDMAC\example\song.yml --contr
 When running the built executable directly:
 
 ```powershell
-EDMAC\bin\Debug\net10.0\edmac.exe EDMAC\example\song.yml
-EDMAC\bin\Debug\net10.0\edmac.exe validate EDMAC\example\song.yml
-EDMAC\bin\Debug\net10.0\edmac.exe render EDMAC\example\song.yml --seconds 32 --out take.wav
-EDMAC\bin\Debug\net10.0\edmac.exe render EDMAC\example\song.yml --arrangement --out full.wav
+EDMAC\bin\Debug\net10.0-windows10.0.19041.0\edmac.exe EDMAC\example\song.yml
+EDMAC\bin\Debug\net10.0-windows10.0.19041.0\edmac.exe validate EDMAC\example\song.yml
+EDMAC\bin\Debug\net10.0-windows10.0.19041.0\edmac.exe render EDMAC\example\song.yml --seconds 32 --out take.wav
+EDMAC\bin\Debug\net10.0-windows10.0.19041.0\edmac.exe render EDMAC\example\song.yml --arrangement --out full.wav
 ```
 
 The repository includes a commented showcase song at
@@ -91,7 +91,10 @@ Playback keys:
 | `R` | Start / stop recording the mixed output to WAV |
 | `Q` | Quit |
 | `Escape` | Quit |
-| `Alt+1` – `Alt+9` | Same as `F1` – `F9` (for terminals that intercept function keys) |
+| `1` - `9` | Same as `F1` - `F9` (for terminals that intercept function keys) |
+| MIDI notes `64,65,67,69,71,72,74,76,77,79` | Same as `F1` - `F10` |
+| MIDI note `62` | Toggle play/pause |
+| MIDI CC `0` - `23` | Same as `F1` - `F24` when the value changes from `0` to a positive value |
 
 Recordings are written under a `recordings` folder beside the running app and
 are date/time stamped, for example `recordings/edmac-20260616-213045-123.wav`.
@@ -804,7 +807,10 @@ Global transport controls:
 | `R` | Start / stop recording the mixed output to WAV |
 | `Q` | Quit playback |
 | `Escape` | Quit playback |
-| `Alt+1` – `Alt+9` | Same as `F1` – `F9` (for terminals that intercept function keys) |
+| `1` - `9` | Same as `F1` - `F9` (for terminals that intercept function keys) |
+| MIDI notes `64,65,67,69,71,72,74,76,77,79` | Same as `F1` - `F10` |
+| MIDI note `62` | Toggle play/pause |
+| MIDI CC `0` - `23` | Same as `F1` - `F24` when the value changes from `0` to a positive value |
 
 Recordings are saved under `recordings` beside the running app executable.
 recording uses a date/time-stamped file name so previous takes are not
@@ -826,8 +832,8 @@ tracks:
     control: f2
 ```
 
-- Press `F1` (or `Alt+1`) to enable `drums` and `bass`.
-- Press `F2` (or `Alt+2`) to enable `bass` and `lead`.
+- Press `F1` (or `1`) to enable `drums` and `bass`.
+- Press `F2` (or `2`) to enable `bass` and `lead`.
 - Tracks can belong to multiple groups by separating controls with commas.
 - Tracks with no `control` field are always enabled.
 - Tracks muted by a group change immediately stop their current notes.

@@ -13,6 +13,9 @@ public sealed class Player : IDisposable
     private readonly Channel<ScheduledTrackNote> noteQueue;
     private readonly bool printStartupDiagnostics;
     private readonly bool[] previousTrackEnabledStates;
+    private readonly object pendingTrackControlLock = new();
+    private readonly double controlGridSamples;
+    private PendingTrackControl? pendingTrackControl;
     private bool disposed;
 
     public Player(Song song, bool printStartupDiagnostics = true)
@@ -31,6 +34,10 @@ public sealed class Player : IDisposable
                 song.Bpm))
             .ToArray();
         previousTrackEnabledStates = new bool[song.Tracks.Count];
+        controlGridSamples = song.Tracks
+            .Select(track => track.TimingPattern.SamplesPerStep)
+            .DefaultIfEmpty(song.SampleRate * 60.0 / song.Bpm)
+            .Min();
 
         audioEngine = new AudioEngine(song.Tracks, instruments, effects, song.SampleRate);
         audioEngine.StoppedUnexpectedly += OnAudioEngineStoppedUnexpectedly;
@@ -48,13 +55,19 @@ public sealed class Player : IDisposable
 
     public async Task RunAsync(CancellationToken cancellationToken)
     {
+        using PlaybackPerformanceScope performanceScope = PlaybackPerformanceScope.Start();
+
         if (printStartupDiagnostics)
         {
             PrintStartupDiagnostics();
         }
 
         using var playbackCancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-        var sequencer = new Sequencer(song, audioEngine, noteQueue.Writer);
+        var sequencer = new Sequencer(
+            song,
+            audioEngine,
+            noteQueue.Writer,
+            ProcessPendingTrackControl);
 
         Task dispatchTask = StartDedicatedWorker(
             () => DispatchNotes(noteQueue.Reader, playbackCancellation.Token),
@@ -187,12 +200,48 @@ public sealed class Player : IDisposable
                 continue;
             }
 
-            ApplyTrackControl(key);
+            QueueTrackControl(key);
             break;
         }
     }
 
-    private void ApplyTrackControl(ConsoleKey key)
+    private void QueueTrackControl(ConsoleKey key)
+    {
+        long samplePosition = audioEngine.SamplePosition;
+        long targetSamplePosition = GetNextControlSamplePosition(samplePosition);
+
+        lock (pendingTrackControlLock)
+        {
+            pendingTrackControl = new PendingTrackControl(key, targetSamplePosition);
+        }
+    }
+
+    private long GetNextControlSamplePosition(long samplePosition)
+    {
+        double nextStep = Math.Ceiling((samplePosition + 1) / controlGridSamples) *
+            controlGridSamples;
+        return checked((long)Math.Round(nextStep, MidpointRounding.AwayFromZero));
+    }
+
+    private void ProcessPendingTrackControl(long stepSamplePosition)
+    {
+        PendingTrackControl? pending;
+
+        lock (pendingTrackControlLock)
+        {
+            pending = pendingTrackControl;
+            if (pending is null || pending.Value.SamplePosition > stepSamplePosition)
+            {
+                return;
+            }
+
+            pendingTrackControl = null;
+        }
+
+        ApplyTrackControl(pending.Value.Control, pending.Value.SamplePosition);
+    }
+
+    private void ApplyTrackControl(ConsoleKey key, long samplePosition)
     {
         for (var trackIndex = 0; trackIndex < song.Tracks.Count; trackIndex++)
         {
@@ -209,15 +258,81 @@ public sealed class Player : IDisposable
                 noteQueue.Writer.TryWrite(new ScheduledTrackNote(
                     trackIndex,
                     new ScheduledNote(
-                        audioEngine.SamplePosition,
+                        samplePosition,
                         track.Channel,
                         0,
                         0),
                     ScheduledNoteKind.NoteOffAllIncludingPlayToCompletion));
             }
+
+            if (!previousTrackEnabledStates[trackIndex] && track.Enabled)
+            {
+                StopCurrentStepIfNeeded(trackIndex, track, samplePosition);
+                TriggerCurrentStep(trackIndex, track, samplePosition);
+            }
         }
 
         ConsoleUi.Control($"Tracks={key} enabled={FormatEnabledTracks()}");
+    }
+
+    private void StopCurrentStepIfNeeded(int trackIndex, Track track, long samplePosition)
+    {
+        Pattern timingPattern = track.TimingPattern;
+        long absoluteStep = (long)Math.Floor(samplePosition / timingPattern.SamplesPerStep);
+        bool isTieStep = track.Patterns.Any(pattern => pattern.IsTieStep(absoluteStep));
+
+        if (isTieStep)
+        {
+            return;
+        }
+
+        noteQueue.Writer.TryWrite(new ScheduledTrackNote(
+            trackIndex,
+            new ScheduledNote(
+                samplePosition,
+                track.Channel,
+                0,
+                0),
+            ScheduledNoteKind.NoteOffAll));
+    }
+
+    private void TriggerCurrentStep(int trackIndex, Track track, long samplePosition)
+    {
+        Pattern timingPattern = track.TimingPattern;
+        long absoluteStep = (long)Math.Floor(samplePosition / timingPattern.SamplesPerStep);
+        Chord? chord = song.GetChord(samplePosition);
+
+        foreach (Pattern pattern in track.Patterns)
+        {
+            char symbol = pattern.GetSymbol(absoluteStep);
+            if (symbol == Pattern.RestSymbol ||
+                symbol == Pattern.TieSymbol ||
+                !pattern.ShouldTrigger(absoluteStep) ||
+                !track.NoteMappings.TryGetValue(symbol, out NoteMapping? mapping))
+            {
+                continue;
+            }
+
+            for (var valueIndex = 0; valueIndex < mapping.Count; valueIndex++)
+            {
+                int note = mapping.Resolve(valueIndex, chord);
+                if (note is < 0 or > 127)
+                {
+                    continue;
+                }
+
+                noteQueue.Writer.TryWrite(new ScheduledTrackNote(
+                    trackIndex,
+                    new ScheduledNote(
+                        samplePosition,
+                        track.Channel,
+                        note,
+                        track.Velocity),
+                    pattern.PlaysToCompletion(absoluteStep)
+                        ? ScheduledNoteKind.NoteOnPlayToCompletion
+                        : ScheduledNoteKind.NoteOn));
+            }
+        }
     }
 
     private void ApplyRenderTrackControl(
@@ -284,6 +399,10 @@ public sealed class Player : IDisposable
             TaskCreationOptions.LongRunning,
             TaskScheduler.Default);
     }
+
+    private readonly record struct PendingTrackControl(
+        ConsoleKey Control,
+        long SamplePosition);
 
     private void DispatchNotes(
         ChannelReader<ScheduledTrackNote> reader,

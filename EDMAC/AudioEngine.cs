@@ -20,6 +20,7 @@ public sealed class AudioEngine : IWaveProvider, IDisposable
     private readonly WaveOutEvent output;
     private readonly AudioRecorder recorder;
     private int effectBypassReads;
+    private int renderThreadConfigured;
     private long samplePosition;
     private bool stopRequested;
     private bool disposed;
@@ -36,7 +37,7 @@ public sealed class AudioEngine : IWaveProvider, IDisposable
         WaveFormat = WaveFormat.CreateIeeeFloatWaveFormat(sampleRate, Channels);
         output = new WaveOutEvent
         {
-            DesiredLatency = 100,
+            DesiredLatency = 80,
             NumberOfBuffers = 3
         };
         recorder = new AudioRecorder(WaveFormat);
@@ -81,6 +82,8 @@ public sealed class AudioEngine : IWaveProvider, IDisposable
 
     public int Read(byte[] buffer, int offset, int count)
     {
+        ConfigureRenderThread();
+
         long renderStartTimestamp = Stopwatch.GetTimestamp();
         Span<byte> bytes = buffer.AsSpan(offset, count);
         Span<float> outputSamples = MemoryMarshal.Cast<byte, float>(bytes);
@@ -132,6 +135,17 @@ public sealed class AudioEngine : IWaveProvider, IDisposable
         recorder.Capture(buffer, offset, count);
         UpdatePerformanceGuard(renderStartTimestamp, totalFrames);
         return count;
+    }
+
+    private void ConfigureRenderThread()
+    {
+        if (Interlocked.Exchange(ref renderThreadConfigured, 1) != 0)
+        {
+            return;
+        }
+
+        Thread.CurrentThread.Name ??= "EDMAC Audio Render";
+        Thread.CurrentThread.Priority = ThreadPriority.AboveNormal;
     }
 
     private void UpdatePerformanceGuard(long renderStartTimestamp, int totalFrames)

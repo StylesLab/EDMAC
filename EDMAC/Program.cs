@@ -16,6 +16,13 @@ internal static class Program
                 return 0;
             }
 
+            if (args.Length == 1 &&
+                args[0].Equals("midi", StringComparison.OrdinalIgnoreCase))
+            {
+                RunMidiMonitor();
+                return 0;
+            }
+
             if (args.Length >= 2 &&
                 args[0].Equals("render", StringComparison.OrdinalIgnoreCase))
             {
@@ -68,10 +75,49 @@ internal static class Program
     {
         Console.WriteLine("Usage:");
         Console.WriteLine("  edmac song.yaml");
+        Console.WriteLine("  edmac midi");
         Console.WriteLine("  edmac validate song.yaml");
         Console.WriteLine("  edmac render song.yaml --seconds 32 --out take.wav");
         Console.WriteLine("  edmac render song.yaml --control f4 --seconds 16 --out chorus.wav");
         Console.WriteLine("  edmac render song.yaml --arrangement --out full.wav");
+    }
+
+    private static void RunMidiMonitor()
+    {
+        Environment.SetEnvironmentVariable("EDMAC_MIDI_TRACE", "1");
+
+        using MidiControlInput input = MidiControlInput.Start(
+            control => ConsoleUi.Control($"Mapped={control}"),
+            () => ConsoleUi.Control("Mapped=Play/Pause"),
+            MidiInputBackend.All);
+
+        if (input.DeviceNames.Count == 0)
+        {
+            ConsoleUi.Info("No MIDI input devices found.");
+        }
+        else
+        {
+            foreach (string deviceName in input.DeviceNames)
+            {
+                ConsoleUi.Success($"MIDI input: {deviceName}");
+            }
+        }
+
+        foreach (string failedDeviceMessage in input.FailedDeviceMessages)
+        {
+            ConsoleUi.Warning($"MIDI input skipped: {failedDeviceMessage}");
+        }
+
+        ConsoleUi.Info("MIDI monitor running. Press Q or Escape to quit.");
+
+        while (true)
+        {
+            ConsoleKey key = Console.ReadKey(intercept: true).Key;
+            if (key is ConsoleKey.Q or ConsoleKey.Escape)
+            {
+                return;
+            }
+        }
     }
 
     private static RenderOptions ParseRenderOptions(string[] args)

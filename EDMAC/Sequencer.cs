@@ -7,16 +7,19 @@ public sealed class Sequencer
     private readonly Song song;
     private readonly AudioEngine audioEngine;
     private readonly ChannelWriter<ScheduledTrackNote> writer;
+    private readonly Action<long>? processPendingControls;
     private readonly long[] lastAbsoluteSteps;
 
     internal Sequencer(
         Song song,
         AudioEngine audioEngine,
-        ChannelWriter<ScheduledTrackNote> writer)
+        ChannelWriter<ScheduledTrackNote> writer,
+        Action<long>? processPendingControls = null)
     {
         this.song = song;
         this.audioEngine = audioEngine;
         this.writer = writer;
+        this.processPendingControls = processPendingControls;
         lastAbsoluteSteps = Enumerable.Repeat(-1L, song.Tracks.Count).ToArray();
     }
 
@@ -55,6 +58,7 @@ public sealed class Sequencer
 
             for (long step = lastAbsoluteSteps[trackIndex] + 1; step <= absoluteStep; step++)
             {
+                processPendingControls?.Invoke(timingPattern.GetSamplePosition(step));
                 ProcessStep(trackIndex, track, timingPattern, step);
             }
 

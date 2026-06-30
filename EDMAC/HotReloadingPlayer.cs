@@ -6,12 +6,14 @@ public sealed class HotReloadingPlayer
 {
     private readonly string yamlPath;
     private readonly object playerLock = new();
+    private readonly SemaphoreSlim transportLock = new(1, 1);
     private readonly Channel<bool> reloadSignals;
     private readonly Channel<AudioEngineStoppedEventArgs> playbackStopSignals;
     private Player? currentPlayer;
     private CancellationTokenSource? currentPlaybackCancellation;
     private Task? currentPlaybackTask;
     private Song? currentSong;
+    private MidiControlInput? midiInput;
     private bool hasLoadedOnce;
     private bool paused = true;
 
@@ -39,10 +41,12 @@ public sealed class HotReloadingPlayer
         ConsoleUi.Banner();
         ConsoleUi.Info("Press Space to start. Space pauses/resumes. H restart. R record. Q or Escape quit.");
         ConsoleUi.Info("Function keys select track groups and progressions.");
+        ConsoleUi.Info("MIDI note 62 toggles play/pause; notes 64,65,67,69,71,72,74,76,77,79 select F1-F10.");
         ConsoleUi.Info("Editing the YAML file will reload it and restart playback.");
 
         using var hostCancellation = new CancellationTokenSource();
         using FileSystemWatcher watcher = CreateWatcher();
+        midiInput = StartMidiInput();
 
         await ReloadAsync();
         watcher.EnableRaisingEvents = true;
@@ -62,7 +66,49 @@ public sealed class HotReloadingPlayer
         {
         }
 
-        await StopCurrentPlayerAsync();
+        midiInput?.Dispose();
+        midiInput = null;
+
+        await transportLock.WaitAsync();
+        try
+        {
+            await StopCurrentPlayerAsync();
+            paused = true;
+        }
+        finally
+        {
+            transportLock.Release();
+        }
+    }
+
+    private MidiControlInput? StartMidiInput()
+    {
+        try
+        {
+            MidiControlInput input = MidiControlInput.Start(
+                HandleMidiControl,
+                HandleMidiPlayPause);
+            if (input.DeviceNames.Count == 0)
+            {
+                ConsoleUi.Info("No MIDI input devices found.");
+            }
+            else
+            {
+                ConsoleUi.Success($"MIDI input: {string.Join(", ", input.DeviceNames)}");
+            }
+
+            foreach (string failedDeviceMessage in input.FailedDeviceMessages)
+            {
+                ConsoleUi.Warning($"MIDI input skipped: {failedDeviceMessage}");
+            }
+
+            return input;
+        }
+        catch (Exception exception)
+        {
+            ConsoleUi.Warning($"MIDI input unavailable: {exception.Message}");
+            return null;
+        }
     }
 
     private FileSystemWatcher CreateWatcher()
@@ -114,16 +160,29 @@ public sealed class HotReloadingPlayer
                 continue;
             }
 
-            string reason = args.Exception is null
-                ? "audio output stopped"
-                : $"audio output stopped: {args.Exception.Message}";
-            ConsoleUi.Warning($"{reason}; restarting playback.");
-
-            await StopCurrentPlayerAsync();
-
-            if (!paused && currentSong is not null)
+            await transportLock.WaitAsync(cancellationToken);
+            try
             {
-                StartPlayer(currentSong, printStartupDiagnostics: false);
+                if (paused || currentSong is null)
+                {
+                    continue;
+                }
+
+                string reason = args.Exception is null
+                    ? "audio output stopped"
+                    : $"audio output stopped: {args.Exception.Message}";
+                ConsoleUi.Warning($"{reason}; restarting playback.");
+
+                await StopCurrentPlayerAsync();
+
+                if (!paused && currentSong is not null)
+                {
+                    StartPlayer(currentSong, printStartupDiagnostics: false);
+                }
+            }
+            finally
+            {
+                transportLock.Release();
             }
         }
     }
@@ -142,29 +201,37 @@ public sealed class HotReloadingPlayer
             return;
         }
 
-        currentSong = song;
-
-        if (paused)
-        {
-            PrintControlSummary(song);
-            hasLoadedOnce = true;
-            ConsoleUi.Success($"Loaded {Path.GetFileName(yamlPath)}. Press Space to play.");
-            return;
-        }
-
-        await StopCurrentPlayerAsync();
-
+        await transportLock.WaitAsync();
         try
         {
-            StartPlayer(song, printStartupDiagnostics: !hasLoadedOnce);
+            currentSong = song;
 
-            PrintControlSummary(song);
-            hasLoadedOnce = true;
-            ConsoleUi.Success($"Reloaded {Path.GetFileName(yamlPath)}");
+            if (paused)
+            {
+                PrintControlSummary(song);
+                hasLoadedOnce = true;
+                ConsoleUi.Success($"Loaded {Path.GetFileName(yamlPath)}. Press Space to play.");
+                return;
+            }
+
+            await StopCurrentPlayerAsync();
+
+            try
+            {
+                StartPlayer(song, printStartupDiagnostics: !hasLoadedOnce);
+
+                PrintControlSummary(song);
+                hasLoadedOnce = true;
+                ConsoleUi.Success($"Reloaded {Path.GetFileName(yamlPath)}");
+            }
+            catch (Exception exception)
+            {
+                ConsoleUi.Error($"Reload failed: {exception.Message}");
+            }
         }
-        catch (Exception exception)
+        finally
         {
-            ConsoleUi.Error($"Reload failed: {exception.Message}");
+            transportLock.Release();
         }
     }
 
@@ -231,8 +298,7 @@ public sealed class HotReloadingPlayer
 
     private static ConsoleKey MapKey(ConsoleKeyInfo keyInfo)
     {
-        if ((keyInfo.Modifiers & ConsoleModifiers.Alt) != 0 &&
-            keyInfo.Key >= ConsoleKey.D1 && keyInfo.Key <= ConsoleKey.D9)
+        if (keyInfo.Key >= ConsoleKey.D1 && keyInfo.Key <= ConsoleKey.D9)
         {
             return ConsoleKey.F1 + (keyInfo.Key - ConsoleKey.D1);
         }
@@ -306,9 +372,82 @@ public sealed class HotReloadingPlayer
         player?.HandleKey(key);
     }
 
+    private void HandleMidiControl(ConsoleKey key)
+    {
+        try
+        {
+            Player? player;
+            lock (playerLock)
+            {
+                player = currentPlayer;
+            }
+
+            player?.HandleKey(key);
+        }
+        catch (Exception exception)
+        {
+            ConsoleUi.Error($"MIDI control failed: {exception.Message}");
+        }
+    }
+
+    private void HandleMidiPlayPause()
+    {
+        try
+        {
+            TogglePlayPauseAsync().GetAwaiter().GetResult();
+        }
+        catch (Exception exception)
+        {
+            ConsoleUi.Error($"MIDI play/pause failed: {exception.Message}");
+        }
+    }
+
     private async Task TogglePlayPauseAsync()
     {
-        if (paused)
+        await transportLock.WaitAsync();
+        try
+        {
+            if (paused)
+            {
+                if (currentSong is null)
+                {
+                    ConsoleUi.Warning("No song is loaded.");
+                    return;
+                }
+
+                if (HasCurrentPlayer())
+                {
+                    await StopCurrentPlayerAsync();
+                }
+
+                StartPlayer(currentSong, printStartupDiagnostics: false);
+                paused = false;
+                ConsoleUi.Control("Play");
+                return;
+            }
+
+            await StopCurrentPlayerAsync();
+            paused = true;
+            ConsoleUi.Control("Pause");
+        }
+        finally
+        {
+            transportLock.Release();
+        }
+    }
+
+    private bool HasCurrentPlayer()
+    {
+        lock (playerLock)
+        {
+            return currentPlayer is not null;
+        }
+    }
+
+    private async Task RestartAsync()
+    {
+        await transportLock.WaitAsync();
+        try
         {
             if (currentSong is null)
             {
@@ -316,29 +455,15 @@ public sealed class HotReloadingPlayer
                 return;
             }
 
+            await StopCurrentPlayerAsync();
             StartPlayer(currentSong, printStartupDiagnostics: false);
             paused = false;
-            ConsoleUi.Control("Play");
-            return;
+            ConsoleUi.Control("Restart");
         }
-
-        await StopCurrentPlayerAsync();
-        paused = true;
-        ConsoleUi.Control("Pause");
-    }
-
-    private async Task RestartAsync()
-    {
-        if (currentSong is null)
+        finally
         {
-            ConsoleUi.Warning("No song is loaded.");
-            return;
+            transportLock.Release();
         }
-
-        await StopCurrentPlayerAsync();
-        StartPlayer(currentSong, printStartupDiagnostics: false);
-        paused = false;
-        ConsoleUi.Control("Restart");
     }
 
     private void ToggleRecording()
