@@ -39,7 +39,7 @@ public sealed class Song
             return null;
         }
 
-        int absoluteQuarter = (int)Math.Floor(samplePosition / SamplesPerChordQuarter);
+        int absoluteQuarter = (int)Math.Floor((samplePosition + 0.5) / SamplesPerChordQuarter);
         return progression.GetChordAtQuarter(absoluteQuarter);
     }
 
