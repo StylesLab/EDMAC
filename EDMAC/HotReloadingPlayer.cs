@@ -170,7 +170,7 @@ public sealed class HotReloadingPlayer
 
                 string reason = args.Exception is null
                     ? "audio output stopped"
-                    : $"audio output stopped: {args.Exception.Message}";
+                    : $"audio output stopped:{Environment.NewLine}{args.Exception}";
                 ConsoleUi.Warning($"{reason}; restarting playback.");
 
                 await StopCurrentPlayerAsync();

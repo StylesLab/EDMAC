@@ -20,12 +20,12 @@ public sealed partial class Chord
 
     private readonly int[] intervals;
 
-    private Chord(string name, int rootMidiNote, bool minor)
+    private Chord(string name, int rootMidiNote, bool minor, int[] intervals)
     {
         Name = name;
         RootMidiNote = rootMidiNote;
         IsMinor = minor;
-        intervals = minor ? [0, 3, 7] : [0, 4, 7];
+        this.intervals = intervals;
     }
 
     public string Name { get; }
@@ -38,7 +38,7 @@ public sealed partial class Chord
     {
         return semitones == 0
             ? this
-            : new Chord(Name, checked(RootMidiNote + semitones), IsMinor);
+            : new Chord(Name, checked(RootMidiNote + semitones), IsMinor, intervals);
     }
 
     public int GetTone(int index)
@@ -59,7 +59,7 @@ public sealed partial class Chord
         if (!match.Success)
         {
             throw new InvalidDataException(
-                $"Chord '{text}' is invalid. Use names such as Bm, G, C#, or Bb.");
+                $"Chord '{text}' is invalid. Use names such as Bm, G, C#, Bb, Cm7, Ebmaj7, or F7.");
         }
 
         char noteName = char.ToUpperInvariant(match.Groups["note"].Value[0]);
@@ -78,15 +78,24 @@ public sealed partial class Chord
         pitchClass = (pitchClass + 12) % 12;
         int rootMidiNote = (RootOctave + 1) * 12 + pitchClass;
 
-        bool minor = match.Groups["quality"].Value.Equals(
-            "m",
-            StringComparison.OrdinalIgnoreCase);
+        string quality = match.Groups["quality"].Value;
+        bool minor = quality.Equals("m", StringComparison.OrdinalIgnoreCase) ||
+            quality.Equals("m7", StringComparison.OrdinalIgnoreCase);
 
-        return new Chord(text.Trim(), rootMidiNote, minor);
+        int[] intervals = quality.ToLowerInvariant() switch
+        {
+            "m" => [0, 3, 7],
+            "m7" => [0, 3, 7, 10],
+            "7" => [0, 4, 7, 10],
+            "maj7" => [0, 4, 7, 11],
+            _ => [0, 4, 7]
+        };
+
+        return new Chord(text.Trim(), rootMidiNote, minor, intervals);
     }
 
     [GeneratedRegex(
-        "^(?<note>[A-Ga-g])(?<accidental>[#b]?)(?<quality>m?)$",
-        RegexOptions.CultureInvariant)]
+        "^(?<note>[A-Ga-g])(?<accidental>[#b]?)(?<quality>maj7|m7|7|m?)$",
+        RegexOptions.CultureInvariant | RegexOptions.IgnoreCase)]
     private static partial Regex ChordNameRegex();
 }

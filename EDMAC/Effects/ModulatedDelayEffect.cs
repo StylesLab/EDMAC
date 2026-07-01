@@ -71,6 +71,11 @@ public sealed class ModulatedDelayEffect : IAudioEffect
             readPosition += buffer.Length;
         }
 
+        while (readPosition >= buffer.Length)
+        {
+            readPosition -= buffer.Length;
+        }
+
         int index0 = (int)readPosition;
         int index1 = (index0 + 1) % buffer.Length;
         float fraction = readPosition - index0;

@@ -299,7 +299,7 @@ Controls must be function keys from `f1` through `f24`.
 Supported chord names use this form:
 
 ```text
-NOTE + optional accidental + optional m
+NOTE + optional accidental + optional quality
 ```
 
 Examples:
@@ -309,15 +309,21 @@ C
 Bm
 C#
 Bb
+Cm7
+Ebmaj7
+F7
 ```
 
 - No quality suffix means a major triad.
 - `m` means a minor triad.
+- `m7` means a minor seventh chord.
+- `7` means a dominant seventh chord.
+- `maj7` means a major seventh chord.
 - Sharps and flats are supported.
 - Chord roots use octave 2 internally: `C` is MIDI note 36 and `B` is MIDI note 47.
 
-Extended names such as `Cmaj7`, `G7`, `Dsus4`, and slash chords are not
-currently supported.
+Extended names such as `Dsus4`, `Cadd9`, and slash chords are not currently
+supported.
 
 ### Chord Durations
 
@@ -741,18 +747,18 @@ map:
   - c: [2]
 ```
 
-Indices are zero-based positions in the current major or minor triad:
+Indices are zero-based positions in the current chord:
 
 | Index | Chord tone |
 | --- | --- |
 | `0` | Root |
 | `1` | Third |
 | `2` | Fifth |
-| `3` | Root, one octave higher |
-| `4` | Third, one octave higher |
-| `-1` | Fifth below the root |
-| `-2` | Third below the root |
-| `-3` | Root, one octave lower |
+| `3` | Seventh, for seventh chords; otherwise root, one octave higher |
+| `4` | Root, one octave higher for seventh chords; otherwise third, one octave higher |
+| `-1` | Last chord tone below the root |
+| `-2` | Previous chord tone below the root |
+| `-3` | Previous chord tone below the root |
 
 For `Bm`:
 
@@ -765,6 +771,7 @@ For `Bm`:
 | `[-1]` | 42 | F#2 |
 
 These are chord-tone indices, not semitone offsets or full scale degrees.
+Triads wrap every three tones; seventh chords wrap every four tones.
 
 A single symbol can trigger several chord tones:
 
