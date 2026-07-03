@@ -6,6 +6,9 @@ namespace EDMAC;
 
 public sealed class Player : IDisposable
 {
+    private const int BeatsPerBar = 4;
+    private const double ControlCatchWindowMilliseconds = 120;
+
     private readonly Song song;
     private readonly IInstrument[] instruments;
     private readonly AudioEngine audioEngine;
@@ -13,15 +16,18 @@ public sealed class Player : IDisposable
     private readonly Channel<ScheduledTrackNote> noteQueue;
     private readonly bool printStartupDiagnostics;
     private readonly bool[] previousTrackEnabledStates;
-    private readonly object pendingTrackControlLock = new();
-    private readonly double controlGridSamples;
+    private readonly object pendingControlLock = new();
+    private readonly double controlQuantizeSamples;
+    private readonly double controlCatchWindowSamples;
     private PendingTrackControl? pendingTrackControl;
+    private PendingProgressionControl? pendingProgressionControl;
     private bool disposed;
 
     public Player(Song song, bool printStartupDiagnostics = true)
     {
         this.song = song;
         this.printStartupDiagnostics = printStartupDiagnostics;
+        song.ResetPlaybackPosition();
         song.InitializeTrackEnabledStates();
 
         instruments = song.Tracks
@@ -34,10 +40,8 @@ public sealed class Player : IDisposable
                 song.Bpm))
             .ToArray();
         previousTrackEnabledStates = new bool[song.Tracks.Count];
-        controlGridSamples = song.Tracks
-            .Select(track => track.TimingPattern.SamplesPerStep)
-            .DefaultIfEmpty(song.SampleRate * 60.0 / song.Bpm)
-            .Min();
+        controlQuantizeSamples = song.SampleRate * 60.0 / song.Bpm * BeatsPerBar;
+        controlCatchWindowSamples = song.SampleRate * ControlCatchWindowMilliseconds / 1000.0;
 
         audioEngine = new AudioEngine(song.Tracks, instruments, effects, song.SampleRate);
         audioEngine.StoppedUnexpectedly += OnAudioEngineStoppedUnexpectedly;
@@ -67,7 +71,7 @@ public sealed class Player : IDisposable
             song,
             audioEngine,
             noteQueue.Writer,
-            ProcessPendingTrackControl);
+            ProcessPendingControls);
 
         Task dispatchTask = StartDedicatedWorker(
             () => DispatchNotes(noteQueue.Reader, playbackCancellation.Token),
@@ -186,10 +190,9 @@ public sealed class Player : IDisposable
 
     public void HandleKey(ConsoleKey key)
     {
-        ChordProgression? progression = song.CycleProgression(key);
-        if (progression is not null)
+        if (song.HasProgressionControl(key))
         {
-            ConsoleUi.Control($"Progression={progression.Name}");
+            QueueProgressionControl(key);
         }
 
         for (var trackIndex = 0; trackIndex < song.Tracks.Count; trackIndex++)
@@ -210,38 +213,99 @@ public sealed class Player : IDisposable
         long samplePosition = audioEngine.SamplePosition;
         long targetSamplePosition = GetNextControlSamplePosition(samplePosition);
 
-        lock (pendingTrackControlLock)
+        lock (pendingControlLock)
         {
             pendingTrackControl = new PendingTrackControl(key, targetSamplePosition);
         }
     }
 
+    private void QueueProgressionControl(ConsoleKey key)
+    {
+        long samplePosition = audioEngine.SamplePosition;
+        long targetSamplePosition = GetNextControlSamplePosition(samplePosition);
+
+        lock (pendingControlLock)
+        {
+            pendingProgressionControl = new PendingProgressionControl(key, targetSamplePosition);
+        }
+    }
+
     private long GetNextControlSamplePosition(long samplePosition)
     {
-        double nextStep = Math.Ceiling((samplePosition + 1) / controlGridSamples) *
-            controlGridSamples;
+        double currentStep = Math.Floor(samplePosition / controlQuantizeSamples) *
+            controlQuantizeSamples;
+        double samplesSinceCurrentStep = samplePosition - currentStep;
+        if (currentStep > 0 &&
+            samplesSinceCurrentStep <= controlCatchWindowSamples)
+        {
+            return checked((long)Math.Round(
+                currentStep,
+                MidpointRounding.AwayFromZero));
+        }
+
+        double nextStep = Math.Ceiling((samplePosition + 1) / controlQuantizeSamples) *
+            controlQuantizeSamples;
         return checked((long)Math.Round(nextStep, MidpointRounding.AwayFromZero));
     }
 
-    private void ProcessPendingTrackControl(long stepSamplePosition)
+    private void ProcessPendingControls(long samplePosition)
     {
-        PendingTrackControl? pending;
+        PendingProgressionControl? progression;
+        PendingTrackControl? track;
 
-        lock (pendingTrackControlLock)
+        lock (pendingControlLock)
         {
-            pending = pendingTrackControl;
-            if (pending is null || pending.Value.SamplePosition > stepSamplePosition)
+            progression = pendingProgressionControl;
+            if (progression is not null &&
+                progression.Value.SamplePosition <= samplePosition)
             {
-                return;
+                pendingProgressionControl = null;
             }
 
-            pendingTrackControl = null;
+            track = pendingTrackControl;
+            if (track is not null &&
+                track.Value.SamplePosition <= samplePosition)
+            {
+                pendingTrackControl = null;
+            }
         }
 
-        ApplyTrackControl(pending.Value.Control, pending.Value.SamplePosition);
+        bool appliedProgression = progression is not null &&
+            progression.Value.SamplePosition <= samplePosition;
+
+        if (appliedProgression)
+        {
+            ApplyProgressionControl(
+                progression!.Value.Control,
+                progression.Value.SamplePosition);
+        }
+
+        if (track is not null &&
+            track.Value.SamplePosition <= samplePosition)
+        {
+            ApplyTrackControl(
+                track.Value.Control,
+                track.Value.SamplePosition,
+                triggerEnabledTracks: !appliedProgression);
+        }
     }
 
-    private void ApplyTrackControl(ConsoleKey key, long samplePosition)
+    private void ApplyProgressionControl(ConsoleKey key, long samplePosition)
+    {
+        ChordProgression? progression = song.CycleProgression(key, samplePosition);
+        if (progression is null)
+        {
+            return;
+        }
+
+        StopAllTracks(samplePosition);
+        ConsoleUi.Control($"Progression={progression.Name}");
+    }
+
+    private void ApplyTrackControl(
+        ConsoleKey key,
+        long samplePosition,
+        bool triggerEnabledTracks = true)
     {
         for (var trackIndex = 0; trackIndex < song.Tracks.Count; trackIndex++)
         {
@@ -265,7 +329,9 @@ public sealed class Player : IDisposable
                     ScheduledNoteKind.NoteOffAllIncludingPlayToCompletion));
             }
 
-            if (!previousTrackEnabledStates[trackIndex] && track.Enabled)
+            if (triggerEnabledTracks &&
+                !previousTrackEnabledStates[trackIndex] &&
+                track.Enabled)
             {
                 StopCurrentStepIfNeeded(trackIndex, track, samplePosition);
                 TriggerCurrentStep(trackIndex, track, samplePosition);
@@ -278,8 +344,9 @@ public sealed class Player : IDisposable
     private void StopCurrentStepIfNeeded(int trackIndex, Track track, long samplePosition)
     {
         Pattern timingPattern = track.TimingPattern;
-        long absoluteStep = (long)Math.Floor(samplePosition / timingPattern.SamplesPerStep);
-        bool isTieStep = track.Patterns.Any(pattern => pattern.IsTieStep(absoluteStep));
+        long sectionSamplePosition = song.GetSectionSamplePosition(samplePosition);
+        long sectionStep = (long)Math.Floor(sectionSamplePosition / timingPattern.SamplesPerStep);
+        bool isTieStep = track.Patterns.Any(pattern => pattern.IsTieStep(sectionStep));
 
         if (isTieStep)
         {
@@ -299,15 +366,16 @@ public sealed class Player : IDisposable
     private void TriggerCurrentStep(int trackIndex, Track track, long samplePosition)
     {
         Pattern timingPattern = track.TimingPattern;
-        long absoluteStep = (long)Math.Floor(samplePosition / timingPattern.SamplesPerStep);
+        long sectionSamplePosition = song.GetSectionSamplePosition(samplePosition);
+        long sectionStep = (long)Math.Floor(sectionSamplePosition / timingPattern.SamplesPerStep);
         Chord? chord = song.GetChord(samplePosition);
 
         foreach (Pattern pattern in track.Patterns)
         {
-            char symbol = pattern.GetSymbol(absoluteStep);
+            char symbol = pattern.GetSymbol(sectionStep);
             if (symbol == Pattern.RestSymbol ||
                 symbol == Pattern.TieSymbol ||
-                !pattern.ShouldTrigger(absoluteStep) ||
+                !pattern.ShouldTrigger(sectionStep) ||
                 !track.NoteMappings.TryGetValue(symbol, out NoteMapping? mapping))
             {
                 continue;
@@ -328,10 +396,26 @@ public sealed class Player : IDisposable
                         track.Channel,
                         note,
                         track.Velocity),
-                    pattern.PlaysToCompletion(absoluteStep)
+                    pattern.PlaysToCompletion(sectionStep)
                         ? ScheduledNoteKind.NoteOnPlayToCompletion
                         : ScheduledNoteKind.NoteOn));
             }
+        }
+    }
+
+    private void StopAllTracks(long samplePosition)
+    {
+        for (var trackIndex = 0; trackIndex < song.Tracks.Count; trackIndex++)
+        {
+            Track track = song.Tracks[trackIndex];
+            noteQueue.Writer.TryWrite(new ScheduledTrackNote(
+                trackIndex,
+                new ScheduledNote(
+                    samplePosition,
+                    track.Channel,
+                    0,
+                    0),
+                ScheduledNoteKind.NoteOffAllIncludingPlayToCompletion));
         }
     }
 
@@ -401,6 +485,10 @@ public sealed class Player : IDisposable
     }
 
     private readonly record struct PendingTrackControl(
+        ConsoleKey Control,
+        long SamplePosition);
+
+    private readonly record struct PendingProgressionControl(
         ConsoleKey Control,
         long SamplePosition);
 

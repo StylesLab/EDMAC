@@ -831,7 +831,8 @@ tracks:
 - Tracks with no `control` field are always enabled.
 - Tracks muted by a group change immediately stop their current notes.
 - The pattern timing continues while muted.
-- Re-enabled tracks rejoin the pattern at its current position.
+- Re-enabled tracks rejoin the pattern at the current position in the active
+  progression section.
 
 Progression controls select or cycle progressions:
 
@@ -842,8 +843,11 @@ progressions:
     control: f9
 ```
 
-A progression change takes effect when subsequent notes are generated. It
-does not restart the song clock or progression position.
+A progression change is queued to the next bar boundary and starts a new
+section there: the selected progression begins at its first chord, all currently
+sounding notes stop, and track patterns restart from their first step.
+If a control lands just after a bar boundary because of playback buffering,
+EDMAC still lets it catch that bar within a short tolerance window.
 
 Avoid assigning the same key to a track and a progression unless you
 intentionally want one key press to perform both actions.

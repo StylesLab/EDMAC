@@ -2,7 +2,7 @@ namespace EDMAC;
 
 public sealed class Song
 {
-    private int activeProgressionIndex;
+    private ProgressionSelection progressionSelection = new(0, 0, 0);
     private int activeTrackControl;
 
     public required double Bpm { get; init; }
@@ -22,7 +22,13 @@ public sealed class Song
     public ChordProgression? ActiveProgression =>
         Progressions.Count == 0
             ? null
-            : Progressions[Volatile.Read(ref activeProgressionIndex)];
+            : Progressions[Volatile.Read(ref progressionSelection).Index];
+
+    public long SectionStartSamplePosition =>
+        Volatile.Read(ref progressionSelection).StartSamplePosition;
+
+    public long SectionVersion =>
+        Volatile.Read(ref progressionSelection).Version;
 
     public ConsoleKey? ActiveTrackControl =>
         HasTrackControls
@@ -33,36 +39,64 @@ public sealed class Song
 
     public Chord? GetChord(long samplePosition)
     {
-        ChordProgression? progression = ActiveProgression;
-        if (progression is null)
+        ProgressionSelection selection = Volatile.Read(ref progressionSelection);
+        if (Progressions.Count == 0)
         {
             return null;
         }
 
-        int absoluteQuarter = (int)Math.Floor((samplePosition + 0.5) / SamplesPerChordQuarter);
-        return progression.GetChordAtQuarter(absoluteQuarter);
+        ChordProgression progression = Progressions[selection.Index];
+        long sectionSamplePosition = Math.Max(0, samplePosition - selection.StartSamplePosition);
+        int sectionQuarter = (int)Math.Floor((sectionSamplePosition + 0.5) / SamplesPerChordQuarter);
+        return progression.GetChordAtQuarter(sectionQuarter);
     }
 
-    public ChordProgression? CycleProgression(ConsoleKey control)
+    public (long StartSamplePosition, long Version) GetSectionTiming()
+    {
+        ProgressionSelection selection = Volatile.Read(ref progressionSelection);
+        return (selection.StartSamplePosition, selection.Version);
+    }
+
+    public long GetSectionSamplePosition(long samplePosition)
+    {
+        ProgressionSelection selection = Volatile.Read(ref progressionSelection);
+        return Math.Max(0, samplePosition - selection.StartSamplePosition);
+    }
+
+    public ChordProgression? CycleProgression(ConsoleKey control, long samplePosition)
     {
         if (Progressions.Count == 0)
         {
             return null;
         }
 
-        int current = Volatile.Read(ref activeProgressionIndex);
+        ProgressionSelection current = Volatile.Read(ref progressionSelection);
 
         for (var offset = 1; offset <= Progressions.Count; offset++)
         {
-            int candidate = (current + offset) % Progressions.Count;
+            int candidate = (current.Index + offset) % Progressions.Count;
             if (Progressions[candidate].Control == control)
             {
-                Interlocked.Exchange(ref activeProgressionIndex, candidate);
+                var next = new ProgressionSelection(
+                    candidate,
+                    samplePosition,
+                    current.Version + 1);
+                Volatile.Write(ref progressionSelection, next);
                 return Progressions[candidate];
             }
         }
 
         return null;
+    }
+
+    public void ResetPlaybackPosition()
+    {
+        ProgressionSelection current = Volatile.Read(ref progressionSelection);
+        var reset = new ProgressionSelection(
+            current.Index,
+            0,
+            current.Version + 1);
+        Volatile.Write(ref progressionSelection, reset);
     }
 
     public void InitializeTrackEnabledStates(
@@ -87,6 +121,11 @@ public sealed class Song
         return Tracks.Any(track => track.HasControl(control));
     }
 
+    public bool HasProgressionControl(ConsoleKey control)
+    {
+        return Progressions.Any(progression => progression.Control == control);
+    }
+
     public void ApplyTrackControl(ConsoleKey control, Func<Track, bool>? trackFilter = null)
     {
         Interlocked.Exchange(ref activeTrackControl, (int)control);
@@ -98,6 +137,11 @@ public sealed class Song
             track.SetEnabled(enabledByControl && enabledByFilter);
         }
     }
+
+    private sealed record ProgressionSelection(
+        int Index,
+        long StartSamplePosition,
+        long Version);
 }
 
 public sealed class ArrangementStep
